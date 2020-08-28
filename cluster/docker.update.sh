@@ -25,6 +25,7 @@ DOCKER_BUILDKIT=1 docker build \
 docker tag ${REPO_BASE} hanguo97/${REPO_BASE}:${HeadCommitSHA}
 docker push hanguo97/${REPO_BASE}:${HeadCommitSHA}
 
+cd ./${DIRECTORY_BASE}
 # Modify the tag in the related files
 git checkout -- cluster/docker.run.gpu.sh  # this is important
 sed -i -e 's@IMAGE_TAG@'"$HeadCommitSHA"'@' cluster/docker.run.gpu.sh
