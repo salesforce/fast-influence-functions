@@ -50,9 +50,9 @@ RUN \
 # ---------------------------------------------
 # Build Python depencies and utilize caching
 # ---------------------------------------------
-COPY ./requirements.txt /workspace/hguo-scratchpad/requirements.txt
+COPY ./fast-influence-functions/requirements.txt /workspace/fast-influence-functions/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r /workspace/hguo-scratchpad/requirements.txt && \
+    pip install --no-cache-dir -r /workspace/fast-influence-functions/requirements.txt && \
     # Jupyter Extensions (https://plot.ly/python/getting-started/):
     # Avoid "JavaScript heap out of memory" errors during extension installation (OS X/Linux)
     export NODE_OPTIONS=--max-old-space-size=4096 && \
@@ -63,10 +63,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
     unset NODE_OPTIONS
 
 # upload everything
-COPY . /workspace/hguo-scratchpad/
+COPY --chown=259446:3406 ./fast-influence-functions/ /workspace/fast-influence-functions/
 
 # Set HOME
-ENV HOME="/workspace/hguo-scratchpad"
+ENV HOME="/workspace/fast-influence-functions"
 
 # ---------------------------------------------
 # Project-agnostic User-dependent Dependencies
