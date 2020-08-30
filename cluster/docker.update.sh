@@ -27,7 +27,7 @@ docker push hanguo97/${REPO_BASE}:${HeadCommitSHA}
 
 cd ./${DIRECTORY_BASE}
 # Modify the tag in the related files
-git checkout -- cluster/docker.run.gpu.sh  # this is important
+git checkout -- cluster/docker.run.sh  # this is important
 sed -i -e 's@IMAGE_TAG@'"$HeadCommitSHA"'@' cluster/docker.run.sh
 
 # Modify the tag in the related files
