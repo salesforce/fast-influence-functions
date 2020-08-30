@@ -30,9 +30,9 @@ RUN \
     # ubuntu-drivers autoinstall && \
     # https://serverfault.com/questions/227190/how-do-i-ask-apt-get-to-skip-any-interactive-post-install-configuration-steps
     # https://stackoverflow.com/questions/38165407/installing-lightdm-in-dockerfile-raises-interactive-keyboard-layout-menu
-    apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        nvidia-driver-440 && \
-    rm -rf /var/lib/apt/lists/* && \
+    # apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    #     nvidia-driver-440 && \
+    # rm -rf /var/lib/apt/lists/* && \
     # Install NodeJS
     # https://github.com/nodesource/distributions/blob/master/README.md#deb
     curl -sL https://deb.nodesource.com/setup_12.x | bash - && \
