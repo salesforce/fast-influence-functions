@@ -157,3 +157,18 @@ def save_and_mirror_scp_to_remote(
         remote_file_name=remote_file_name)
 
     return client, remote_file_name
+
+
+def test_save_and_mirror_scp_to_remote():
+    import torch  # Only importing torch here
+    tensor = torch.rand(100, 100)
+    client, remote_file_name = save_and_mirror_scp_to_remote(
+        object_to_save=tensor,
+        file_name="random_tensor_test.pt")
+
+    client.scp_file_from_remote(
+        remote_file_name=remote_file_name,
+        local_file_name="fetched_random_tensor_test.pt")
+
+    fetched_tensor = torch.load("fetched_random_tensor_test.pt")
+    print(f"Remote and Local Matched: {(fetched_tensor == tensor).all()}")
