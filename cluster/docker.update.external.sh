@@ -18,7 +18,7 @@ cd /proj/bansallab/users/han/DLResearch
 # More: https://docs.docker.com/develop/develop-images/build_enhancements/
 DOCKER_BUILDKIT=1 docker build \
     -t ${REPO_BASE} \
-    -f ${DIRECTORY_BASE}/Dockerfile \
+    -f ${DIRECTORY_BASE}/Dockerfile.external \
     --secret id=wandb_apikey,src=secrets/wandb.apikey.secret  .
 
 # Push to the registry
