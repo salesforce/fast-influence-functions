@@ -140,3 +140,4 @@ cython_debug/
 # Sublime
 *.sublime-project
 *.sublime-workspace
+*.pem

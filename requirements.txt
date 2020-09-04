@@ -7,3 +7,5 @@ faiss-gpu
 overrides
 contexttimer
 pandas
+yagmail[all]
+scp
