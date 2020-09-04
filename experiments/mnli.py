@@ -16,9 +16,14 @@ from experiments import misc_utils
 
 
 def run_full_influence_functions(
+        mode: str,
         num_examples_to_test: int,
         s_test_num_samples: int = 1000
 ) -> Dict[int, Dict[str, Any]]:
+
+    if mode not in ["only-correct", "only-incorrect"]:
+        raise ValueError(f"Unrecognized mode {mode}")
+
     tokenizer, model = misc_utils.create_tokenizer_and_model(
         constants.MNLI_MODEL_PATH)
 
@@ -53,11 +58,20 @@ def run_full_influence_functions(
         if not p.requires_grad]
 
     model.cuda()
+    num_examples_tested = 0
     outputs_collections = {}
     for test_index, test_inputs in enumerate(eval_instance_data_loader):
-        print(f"Running #{test_index}")
-        if test_index >= num_examples_to_test:
+        if num_examples_tested >= num_examples_to_test:
             break
+
+        # Skip when we only want cases of correction prediction but the
+        # prediction is incorrect, or vice versa
+        prediction_is_correct = misc_utils.is_prediction_correct()
+        if mode == "only-correct" and not prediction_is_correct:
+            continue
+
+        if mode == "only-incorrect" and prediction_is_correct:
+            continue
 
         with Timer() as timer:
             influences, _, s_test = nn_influence_utils.compute_influences(
@@ -77,10 +91,18 @@ def run_full_influence_functions(
                 s_test_iterations=1,
                 precomputed_s_test=None)
 
+            num_examples_tested += 1
             outputs_collections[test_index] = {
                 "influences": influences,
                 "s_test": s_test,
-                "time": timer.elapsed}
+                "time": timer.elapsed,
+                "correct": prediction_is_correct,
+            }
+
+            remote_utils.save_and_mirror_scp_to_remote(
+                object_to_save=outputs_collections[test_index],
+                file_name=f"KNN-recall.{mode}.{num_examples_to_test}.{test_index}.pth")
+            print(f"Status: #{test_index} | {num_examples_tested} / {num_examples_to_test}")
 
     return outputs_collections
 
