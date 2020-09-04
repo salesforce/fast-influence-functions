@@ -11,6 +11,8 @@ from paramiko import SSHClient
 
 from typing import List, Optional, Any, Tuple
 
+from experiments import misc_utils
+
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 DEFAULT_SENDER_EMAIL = None
 DEFAULT_RECIPIENT_EMAIL = None
@@ -171,4 +173,6 @@ def test_save_and_mirror_scp_to_remote():
         local_file_name="fetched_random_tensor_test.pt")
 
     fetched_tensor = torch.load("fetched_random_tensor_test.pt")
+    misc_utils.remove_file_if_exists("random_tensor_test.pt")
+    misc_utils.remove_file_if_exists("fetched_random_tensor_test.pt")
     print(f"Remote and Local Matched: {(fetched_tensor == tensor).all()}")

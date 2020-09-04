@@ -1,3 +1,4 @@
+import os
 import torch
 import numpy as np
 # from tqdm import tqdm
@@ -168,3 +169,10 @@ def get_dataloader(dataset: CustomGlueDataset,
     )
 
     return data_loader
+
+
+def remove_file_if_exists(file_name: str) -> None:
+    if os.path.exists(file_name):
+        os.remove(file_name)
+    else:
+        print("The file does not exist")
