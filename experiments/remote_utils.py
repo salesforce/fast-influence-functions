@@ -9,25 +9,17 @@ import yagmail
 from scp import SCPClient
 from paramiko import SSHClient
 from transformers import trainer_utils
-
 from typing import List, Optional, Any, Tuple
 
 from experiments import misc_utils
+from experiments import constants
 
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
-DEFAULT_SENDER_EMAIL = None
-DEFAULT_RECIPIENT_EMAIL = None
-DEFAULT_SENDER_PASSWORD = None
-DEFAULT_SERVER_USERNAME = "ec2-user"
-DEFAULT_SERVER_PASSWORD = None
-DEFAULT_SERVER_ADDRESS = "ec2-54-172-210-41.compute-1.amazonaws.com"
-DEFAULT_SSH_KEY_FILENAME = "./cluster/salesforce-intern-project.pem"
-DEFAULT_REMOTE_BASE_DIR = os.getenv("REMOTE_BASE_DIR")
 
 
 def setup_and_verify_environment() -> None:
     # Check the environment
-    if DEFAULT_REMOTE_BASE_DIR is None:
+    if constants.REMOTE_DEFAULT_REMOTE_BASE_DIR is None:
         raise ValueError(f"`REMOTE_BASE_DIR` is not set.")
 
     if trainer_utils.is_wandb_available() is False:
@@ -41,13 +33,13 @@ class EmailClient(object):
                  recipient_email: Optional[str] = None) -> None:
 
         if sender_email is None:
-            sender_email = DEFAULT_SENDER_EMAIL
+            sender_email = constants.REMOTE_DEFAULT_SENDER_EMAIL
 
         if sender_password is None:
-            sender_password = DEFAULT_SENDER_PASSWORD
+            sender_password = constants.REMOTE_DEFAULT_SENDER_PASSWORD
 
         if recipient_email is None:
-            recipient_email = DEFAULT_RECIPIENT_EMAIL
+            recipient_email = constants.REMOTE_DEFAULT_RECIPIENT_EMAIL
 
         self._sender_email = sender_email
         self._recipient_email = recipient_email
@@ -75,13 +67,13 @@ def send_email(subject: str,
                sender_password: Optional[str] = None,
                recipient_email: Optional[str] = None) -> List[str]:
     if sender_email is None:
-        sender_email = DEFAULT_SENDER_EMAIL
+        sender_email = constants.REMOTE_DEFAULT_SENDER_EMAIL
 
     if sender_password is None:
-        sender_password = DEFAULT_SENDER_PASSWORD
+        sender_password = constants.REMOTE_DEFAULT_SENDER_PASSWORD
 
     if recipient_email is None:
-        recipient_email = DEFAULT_RECIPIENT_EMAIL
+        recipient_email = constants.REMOTE_DEFAULT_RECIPIENT_EMAIL
 
     # Prepare Headers
     message_time = datetime.datetime.now()
@@ -103,13 +95,13 @@ class ScpClient(object):
                  server_password: Optional[str] = None,
                  ssh_key_filename: Optional[str] = None) -> None:
         if server_address is None:
-            server_address = DEFAULT_SERVER_ADDRESS
+            server_address = constants.REMOTE_DEFAULT_SERVER_ADDRESS
         if server_username is None:
-            server_username = DEFAULT_SERVER_USERNAME
+            server_username = constants.REMOTE_DEFAULT_SERVER_USERNAME
         if server_password is None:
-            server_password = DEFAULT_SERVER_PASSWORD
+            server_password = constants.REMOTE_DEFAULT_SERVER_PASSWORD
         if ssh_key_filename is None:
-            ssh_key_filename = DEFAULT_SSH_KEY_FILENAME
+            ssh_key_filename = constants.REMOTE_DEFAULT_SSH_KEY_FILENAME
 
         ssh = SSHClient()
         ssh.load_system_host_keys()
@@ -164,9 +156,9 @@ def save_and_mirror_scp_to_remote(
 
     host_name = socket.gethostname()
     remote_file_name = f"{file_name}.{host_name}"
-    if DEFAULT_REMOTE_BASE_DIR is not None:
+    if constants.REMOTE_DEFAULT_REMOTE_BASE_DIR is not None:
         remote_file_name = os.path.join(
-            DEFAULT_REMOTE_BASE_DIR,
+            constants.REMOTE_DEFAULT_REMOTE_BASE_DIR,
             remote_file_name)
 
     client.save_and_mirror_scp_to_remote(
