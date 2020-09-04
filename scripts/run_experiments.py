@@ -1,9 +1,8 @@
-import os
 from typing import Optional
-from transformers import trainer_utils
 
 from experiments import mnli
 from experiments import s_test_speedup
+from experiments import remote_utils
 
 NUM_KNN_RECALL_EXPERIMENTS = 50
 NUM_STEST_EXPERIMENTS = 10
@@ -13,6 +12,8 @@ def KNN_recall_experiments(
         num_experiments: Optional[int] = None
 ) -> None:
     """Experiments to Check The Influence Recall of KNN"""
+    print("RUNNING `KNN_recall_experiments`")
+
     if num_experiments is None:
         num_experiments = NUM_KNN_RECALL_EXPERIMENTS
 
@@ -30,6 +31,8 @@ def s_test_speed_quality_tradeoff_experiments(
         num_experiments: Optional[int] = None
 ) -> None:
     """Experiments to Check The Speed/Quality Trade-off of `s_test` estimation"""
+    print("RUNNING `s_test_speed_quality_tradeoff_experiments`")
+
     if num_experiments is None:
         num_experiments = NUM_STEST_EXPERIMENTS
 
@@ -43,10 +46,7 @@ def s_test_speed_quality_tradeoff_experiments(
         num_examples_to_test=num_experiments)
 
 
-def setup_and_verify_environment():
-    # Check the environment
-    if os.getenv("REMOTE_BASE_DIR") is None:
-        raise ValueError(f"`REMOTE_BASE_DIR` is not set.")
-
-    if trainer_utils.is_wandb_available() is False:
-        raise ValueError("Weight And Bias is not set.")
+if __name__ == "__main__":
+    # Make sure the environment is properly setup
+    remote_utils.setup_and_verify_environment()
+    KNN_recall_experiments()

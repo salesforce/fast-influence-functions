@@ -8,6 +8,7 @@ import socket
 import yagmail
 from scp import SCPClient
 from paramiko import SSHClient
+from transformers import trainer_utils
 
 from typing import List, Optional, Any, Tuple
 
@@ -22,6 +23,15 @@ DEFAULT_SERVER_PASSWORD = None
 DEFAULT_SERVER_ADDRESS = "ec2-54-172-210-41.compute-1.amazonaws.com"
 DEFAULT_SSH_KEY_FILENAME = "./cluster/salesforce-intern-project.pem"
 DEFAULT_REMOTE_BASE_DIR = os.getenv("REMOTE_BASE_DIR")
+
+
+def setup_and_verify_environment() -> None:
+    # Check the environment
+    if DEFAULT_REMOTE_BASE_DIR is None:
+        raise ValueError(f"`REMOTE_BASE_DIR` is not set.")
+
+    if trainer_utils.is_wandb_available() is False:
+        raise ValueError("Weight And Bias is not set.")
 
 
 class EmailClient(object):
