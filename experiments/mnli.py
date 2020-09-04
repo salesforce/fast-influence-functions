@@ -7,12 +7,20 @@ from tqdm import tqdm
 from copy import deepcopy
 from contexttimer import Timer
 from collections import defaultdict
-from influence_utils import faiss_utils
-from influence_utils import nn_influence_utils
+from transformers import TrainingArguments
+from transformers import default_data_collator
 from typing import List, Dict, Tuple, Optional, Union, Any
 
 from experiments import constants
 from experiments import misc_utils
+from experiments import remote_utils
+from influence_utils import faiss_utils
+from influence_utils import nn_influence_utils
+from experiments.data_utils import (
+    glue_output_modes,
+    glue_compute_metrics)
+
+
 
 
 def run_full_influence_functions(
@@ -47,6 +55,35 @@ def run_full_influence_functions(
         batch_size=1,
         random=False)
 
+    output_mode = glue_output_modes["mnli"]
+
+    def build_compute_metrics_fn(task_name: str):
+        def compute_metrics_fn(p):
+            if output_mode == "classification":
+                preds = np.argmax(p.predictions, axis=1)
+            elif output_mode == "regression":
+                preds = np.squeeze(p.predictions)
+            return glue_compute_metrics(task_name, preds, p.label_ids)
+
+        return compute_metrics_fn
+
+    # Most of these arguments are placeholders
+    # and are not really used at all, so ignore
+    # the exact values of these.
+    trainer = transformers.Trainer(
+        model=model,
+        args=TrainingArguments(
+            output_dir="./tmp-output",
+            per_device_train_batch_size=128,
+            per_device_eval_batch_size=128,
+            learning_rate=5e-5,
+            logging_steps=100),
+        data_collator=default_data_collator,
+        train_dataset=mnli_train_dataset,
+        eval_dataset=mnli_eval_dataset,
+        compute_metrics=build_compute_metrics_fn("mnli"),
+    )
+
     params_filter = [
         n for n, p in model.named_parameters()
         if not p.requires_grad]
@@ -66,7 +103,11 @@ def run_full_influence_functions(
 
         # Skip when we only want cases of correction prediction but the
         # prediction is incorrect, or vice versa
-        prediction_is_correct = misc_utils.is_prediction_correct()
+        prediction_is_correct = misc_utils.is_prediction_correct(
+            trainer=trainer,
+            model=model,
+            inputs=test_inputs)
+
         if mode == "only-correct" and not prediction_is_correct:
             continue
 

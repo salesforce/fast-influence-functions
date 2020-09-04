@@ -176,3 +176,19 @@ def remove_file_if_exists(file_name: str) -> None:
         os.remove(file_name)
     else:
         print("The file does not exist")
+
+
+def is_prediction_correct(
+        trainer: Trainer,
+        model: torch.nn.Module,
+        inputs: Dict[str, Union[torch.Tensor, Any]]) -> bool:
+
+    preds, label_ids, step_eval_loss = predict(
+        trainer=trainer,
+        model=model,
+        inputs=inputs)
+
+    if preds.shape[0] != 1:
+        raise ValueError("This function only works on instances.")
+
+    return (preds.argmax(axis=-1) == label_ids).all()
