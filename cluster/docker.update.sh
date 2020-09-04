@@ -35,6 +35,10 @@ git checkout -- cluster/kube.jupyter.yaml  # this is important
 sed -i -e 's@IMAGE_TAG@'"$HeadCommitSHA"'@' cluster/kube.jupyter.yaml
 
 # Modify the tag in the related files
+git checkout -- cluster/kube.experiments.yaml  # this is important
+sed -i -e 's@IMAGE_TAG@'"$HeadCommitSHA"'@' cluster/kube.experiments.yaml
+
+# Modify the tag in the related files
 git checkout -- cluster/kube.jupyter.large.yaml  # this is important
 sed -i -e 's@IMAGE_TAG@'"$HeadCommitSHA"'@' cluster/kube.jupyter.large.yaml
 
