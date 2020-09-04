@@ -21,6 +21,7 @@ DEFAULT_SERVER_USERNAME = "ec2-user"
 DEFAULT_SERVER_PASSWORD = None
 DEFAULT_SERVER_ADDRESS = "ec2-54-172-210-41.compute-1.amazonaws.com"
 DEFAULT_SSH_KEY_FILENAME = "./cluster/salesforce-intern-project.pem"
+DEFAULT_REMOTE_BASE_DIR = os.getenv("REMOTE_BASE_DIR")
 
 
 class EmailClient(object):
@@ -153,6 +154,11 @@ def save_and_mirror_scp_to_remote(
 
     host_name = socket.gethostname()
     remote_file_name = f"{file_name}.{host_name}"
+    if DEFAULT_REMOTE_BASE_DIR is not None:
+        remote_file_name = os.path.join(
+            DEFAULT_REMOTE_BASE_DIR,
+            remote_file_name)
+
     client.save_and_mirror_scp_to_remote(
         object_to_save=object_to_save,
         local_file_name=file_name,
