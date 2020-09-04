@@ -108,10 +108,10 @@ def run_full_influence_functions(
             model=model,
             inputs=test_inputs)
 
-        if mode == "only-correct" and not prediction_is_correct:
+        if mode == "only-correct" and prediction_is_correct is False:
             continue
 
-        if mode == "only-incorrect" and prediction_is_correct:
+        if mode == "only-incorrect" and prediction_is_correct is True:
             continue
 
         with Timer() as timer:
