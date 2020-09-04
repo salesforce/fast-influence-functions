@@ -9,7 +9,7 @@ import yagmail
 from scp import SCPClient
 from paramiko import SSHClient
 
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Tuple
 
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 DEFAULT_SENDER_EMAIL = None
@@ -107,32 +107,41 @@ class ScpClient(object):
                     key_filename=ssh_key_filename)
         self._ssh = ssh
 
-    def scp_file(
+    def scp_file_to_remote(
             self,
-            source_file_name: str,
-            target_file_name: str) -> None:
+            local_file_name: str,
+            remote_file_name: str) -> None:
         with SCPClient(self._ssh.get_transport()) as scp:
-            scp.put(source_file_name, target_file_name)
+            scp.put(files=local_file_name,
+                    remote_path=remote_file_name)
 
-    def save_and_mirror_scp_object(
+    def scp_file_from_remote(
+            self,
+            local_file_name: str,
+            remote_file_name: str) -> None:
+        with SCPClient(self._ssh.get_transport()) as scp:
+            scp.get(remote_path=remote_file_name,
+                    local_path=local_file_name)
+
+    def save_and_mirror_scp_to_remote(
             self,
             object_to_save: Any,
-            source_file_name: str,
-            target_file_name: str) -> None:
+            local_file_name: str,
+            remote_file_name: str) -> None:
 
-        torch.save(object_to_save, source_file_name)
-        self.scp_file(
-            source_file_name=source_file_name,
-            target_file_name=target_file_name)
+        torch.save(object_to_save, local_file_name)
+        self.scp_file_to_remote(
+            local_file_name=local_file_name,
+            remote_file_name=remote_file_name)
 
 
-def save_and_mirror_scp_object(
+def save_and_mirror_scp_to_remote(
         object_to_save: Any,
         file_name: str,
         server_address: Optional[str] = None,
         server_username: Optional[str] = None,
         server_password: Optional[str] = None,
-        ssh_key_filename: Optional[str] = None) -> None:
+        ssh_key_filename: Optional[str] = None) -> Tuple[ScpClient, str]:
 
     client = ScpClient(
         server_address=server_address,
@@ -141,7 +150,10 @@ def save_and_mirror_scp_object(
         ssh_key_filename=ssh_key_filename)
 
     host_name = socket.gethostname()
-    client.save_and_mirror_scp_object(
+    remote_file_name = f"{file_name}.{host_name}"
+    client.save_and_mirror_scp_to_remote(
         object_to_save=object_to_save,
-        source_file_name=file_name,
-        target_file_name=f"{file_name}.{host_name}")
+        local_file_name=file_name,
+        remote_file_name=remote_file_name)
+
+    return client, remote_file_name
