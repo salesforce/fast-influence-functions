@@ -62,7 +62,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
     # Unset NODE_OPTIONS environment variable (OS X/Linux)
     unset NODE_OPTIONS && \
     # for linking path from host machines
-    mkdir -p /export/home
+    mkdir -p /export/ && \
+    chmod -R 777 /export
 
 # upload everything
 COPY --chown=259446:3406 ./fast-influence-functions/ /workspace/fast-influence-functions/
