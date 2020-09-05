@@ -7,18 +7,31 @@ from tqdm import tqdm
 from copy import deepcopy
 from contexttimer import Timer
 from collections import defaultdict
-from influence_utils import faiss_utils
-from influence_utils import nn_influence_utils
+from transformers import TrainingArguments
+from transformers import default_data_collator
 from typing import List, Dict, Tuple, Optional, Union, Any
 
 from experiments import constants
 from experiments import misc_utils
+from experiments import remote_utils
+from influence_utils import faiss_utils
+from influence_utils import nn_influence_utils
+from experiments.data_utils import (
+    glue_output_modes,
+    glue_compute_metrics)
+
+
 
 
 def run_full_influence_functions(
+        mode: str,
         num_examples_to_test: int,
         s_test_num_samples: int = 1000
 ) -> Dict[int, Dict[str, Any]]:
+
+    if mode not in ["only-correct", "only-incorrect"]:
+        raise ValueError(f"Unrecognized mode {mode}")
+
     tokenizer, model = misc_utils.create_tokenizer_and_model(
         constants.MNLI_MODEL_PATH)
 
@@ -42,6 +55,35 @@ def run_full_influence_functions(
         batch_size=1,
         random=False)
 
+    output_mode = glue_output_modes["mnli"]
+
+    def build_compute_metrics_fn(task_name: str):
+        def compute_metrics_fn(p):
+            if output_mode == "classification":
+                preds = np.argmax(p.predictions, axis=1)
+            elif output_mode == "regression":
+                preds = np.squeeze(p.predictions)
+            return glue_compute_metrics(task_name, preds, p.label_ids)
+
+        return compute_metrics_fn
+
+    # Most of these arguments are placeholders
+    # and are not really used at all, so ignore
+    # the exact values of these.
+    trainer = transformers.Trainer(
+        model=model,
+        args=TrainingArguments(
+            output_dir="./tmp-output",
+            per_device_train_batch_size=128,
+            per_device_eval_batch_size=128,
+            learning_rate=5e-5,
+            logging_steps=100),
+        data_collator=default_data_collator,
+        train_dataset=mnli_train_dataset,
+        eval_dataset=mnli_eval_dataset,
+        compute_metrics=build_compute_metrics_fn("mnli"),
+    )
+
     params_filter = [
         n for n, p in model.named_parameters()
         if not p.requires_grad]
@@ -53,11 +95,24 @@ def run_full_influence_functions(
         if not p.requires_grad]
 
     model.cuda()
+    num_examples_tested = 0
     outputs_collections = {}
     for test_index, test_inputs in enumerate(eval_instance_data_loader):
-        print(f"Running #{test_index}")
-        if test_index >= num_examples_to_test:
+        if num_examples_tested >= num_examples_to_test:
             break
+
+        # Skip when we only want cases of correction prediction but the
+        # prediction is incorrect, or vice versa
+        prediction_is_correct = misc_utils.is_prediction_correct(
+            trainer=trainer,
+            model=model,
+            inputs=test_inputs)
+
+        if mode == "only-correct" and prediction_is_correct is False:
+            continue
+
+        if mode == "only-incorrect" and prediction_is_correct is True:
+            continue
 
         with Timer() as timer:
             influences, _, s_test = nn_influence_utils.compute_influences(
@@ -77,10 +132,18 @@ def run_full_influence_functions(
                 s_test_iterations=1,
                 precomputed_s_test=None)
 
+            num_examples_tested += 1
             outputs_collections[test_index] = {
                 "influences": influences,
                 "s_test": s_test,
-                "time": timer.elapsed}
+                "time": timer.elapsed,
+                "correct": prediction_is_correct,
+            }
+
+            remote_utils.save_and_mirror_scp_to_remote(
+                object_to_save=outputs_collections[test_index],
+                file_name=f"KNN-recall.{mode}.{num_examples_to_test}.{test_index}.pth")
+            print(f"Status: #{test_index} | {num_examples_tested} / {num_examples_to_test}")
 
     return outputs_collections
 

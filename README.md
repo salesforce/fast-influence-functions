@@ -33,4 +33,24 @@ Switching gear towards downstream tasks
 
 ### Major Changes
 * Splitting the implementation of sequential vs parallel influence calculation.
-* Added customized Datasets
+* Added customized Datasets.
+
+
+# 0.4
+### Major Changes
+* Two `Dockerfile` and `cluster/docker.update.sh` for building in two environments
+* Added `cluster/kube.experiments.yaml` for non-interactive experiments running.
+* `experiments/mnli.py`: support running experiments on examples that with correct and incorrect predictions.
+* `experiments/`: Added `remote_utils.py` for synchronizing files with a remote server.
+* Removed deprecated `language_modeling.py`
+* Added `run_experiments.py` and `scripts/run_experiments.sh` for non-interactive experiments running.
+* Copied the GLUE data download script and paste them into `scripts/down_glue_data.py`.
+
+### Minor Changes
+* Added the missing `.gitignore`.
+* Merged `cluster/docker.run.{gpu|cpu}.sh` into a single file used in custom environment
+* Updated `cluster/docker.update.sh` to include recent file changes.
+* `experiments/constants.py`: added more constants used in `experiments.remote_utils.py`
+* `experiments/misc_utils.py`: added a few more useful tools.
+* Updated `requirements.txt` with libraries used in `experiments/remote_utils.py`
+
