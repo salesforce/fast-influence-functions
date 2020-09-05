@@ -1,19 +1,19 @@
 apiVersion: v1
 kind: Pod
 metadata:
- name: sfr-pod-hguo
- namespace: sfr-ns-hguo
+ name: sfr-pod-nazneen-rajani
+ namespace: sfr-ns-nazneen-rajani
 spec:
   restartPolicy: OnFailure
   volumes:
-    - name: sfr-home-pv-hguo
+    - name: sfr-home-pv-nazneen-rajani
       persistentVolumeClaim:
-        claimName: sfr-home-pvc-hguo
-    - name: sfr-share-pv-hguo
+        claimName: sfr-home-pvc-nazneen-rajani
+    - name: sfr-share-pv-nazneen-rajani
       persistentVolumeClaim:
-        claimName: sfr-share-pvc-hguo
+        claimName: sfr-share-pvc-nazneen-rajani
   containers:
-    - name: hguo-scratchpad
+    - name: nazneen-rajani-scratchpad
       image: "gcr.io/salesforce-research-internal/hguo-scratchpad:IMAGE_TAG"
       command: ["/bin/bash"]
       args: ["-c", "cd hguo-scratchpad/ && bash ./scripts/run_experiments.sh"]
@@ -23,9 +23,9 @@ spec:
           cpu: "7"
           memory: 45G
       volumeMounts:
-        - name: sfr-home-pv-hguo
+        - name: sfr-home-pv-nazneen-rajani
           mountPath: "/export/home"
-        - name: sfr-share-pv-hguo
+        - name: sfr-share-pv-nazneen-rajani
           mountPath: "/export/share"
   tolerations:
   - key: "gpu_num"
