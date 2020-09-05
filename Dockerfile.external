@@ -60,7 +60,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
     jupyter labextension install @oriolmirosa/jupyterlab_materialdarker --no-build  && \
     jupyter lab build && \
     # Unset NODE_OPTIONS environment variable (OS X/Linux)
-    unset NODE_OPTIONS
+    unset NODE_OPTIONS && \
+    # for linking path from host machines
+    mkdir -p /export/home
 
 # upload everything
 COPY --chown=259446:3406 ./fast-influence-functions/ /workspace/fast-influence-functions/
