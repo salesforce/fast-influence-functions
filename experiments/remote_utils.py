@@ -19,6 +19,9 @@ DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 def setup_and_verify_environment() -> None:
     # Check the environment
+    if not os.path.exists(constants.REMOTE_DEFAULT_SSH_KEY_FILENAME):
+        raise ValueError(f"{constants.REMOTE_DEFAULT_SSH_KEY_FILENAME} does not exist")
+
     if constants.REMOTE_DEFAULT_REMOTE_BASE_DIR is None:
         raise ValueError(f"`REMOTE_BASE_DIR` is not set.")
 
