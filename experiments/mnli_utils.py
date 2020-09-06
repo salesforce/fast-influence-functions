@@ -1,5 +1,8 @@
 import torch
-from transformers import BertTokenizer
+from transformers import (
+    BertTokenizer,
+    InputFeatures,
+    default_data_collator)
 from typing import Tuple, Optional, Union, List
 
 
@@ -32,3 +35,17 @@ def visualize(tokenizer: BertTokenizer,
         logits=None)
     premise, hypothesis = X.split("[CLS]")[1].split("[SEP]")[:2]
     print(f"\tP: {premise.strip()}\n\tH: {hypothesis.strip()}\n\tL: {Y}")
+
+
+def get_inputs_from_features(
+        tokenizer: BertTokenizer,
+        label_list: List[str],
+        feature: InputFeatures
+) -> Tuple[str, str, str]:
+    X, Y = decode_one_example(
+        tokenizer=tokenizer,
+        label_list=label_list,
+        inputs=default_data_collator([feature]),
+        logits=None)
+    premise, hypothesis = X.split("[CLS]")[1].split("[SEP]")[:2]
+    return premise.strip(), hypothesis.strip(), Y
