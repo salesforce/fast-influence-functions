@@ -3,14 +3,15 @@ from transformers import (
     BertTokenizer,
     InputFeatures,
     default_data_collator)
-from typing import Tuple, Optional, Union, List
+from typing import Tuple, Optional, Union, List, Dict
 
 
-def decode_one_example(tokenizer: BertTokenizer,
-                       label_list: List[str],
-                       inputs: torch.LongTensor,
-                       logits: Optional[torch.FloatTensor] = None
-                       ) -> Union[Tuple[str, str], Tuple[str, str, str]]:
+def decode_one_example(
+        tokenizer: BertTokenizer,
+        label_list: List[str],
+        inputs: Dict[str, torch.Tensor],
+        logits: Optional[torch.FloatTensor] = None
+) -> Union[Tuple[str, str], Tuple[str, str, str]]:
 
     if inputs["input_ids"].shape[0] != 1:
         raise ValueError
@@ -27,7 +28,7 @@ def decode_one_example(tokenizer: BertTokenizer,
 
 def visualize(tokenizer: BertTokenizer,
               label_list: List[str],
-              inputs: torch.LongTensor) -> None:
+              inputs: Dict[str, torch.Tensor],) -> None:
     X, Y = decode_one_example(
         tokenizer=tokenizer,
         label_list=label_list,
@@ -37,15 +38,29 @@ def visualize(tokenizer: BertTokenizer,
     print(f"\tP: {premise.strip()}\n\tH: {hypothesis.strip()}\n\tL: {Y}")
 
 
-def get_inputs_from_features(
+def get_data_from_features_or_inputs(
         tokenizer: BertTokenizer,
         label_list: List[str],
-        feature: InputFeatures
+        feature: Optional[InputFeatures] = None,
+        inputs: Optional[Dict[str, torch.Tensor]] = None,
 ) -> Tuple[str, str, str]:
+
+    if feature is not None and inputs is None:
+        inputs = default_data_collator([feature])
+
+    if feature is None and inputs is not None:
+        pass
+
+    if feature is None and inputs is None:
+        raise ValueError
+
+    if feature is not None and inputs is not None:
+        raise ValueError
+
     X, Y = decode_one_example(
         tokenizer=tokenizer,
         label_list=label_list,
-        inputs=default_data_collator([feature]),
+        inputs=inputs,
         logits=None)
     premise, hypothesis = X.split("[CLS]")[1].split("[SEP]")[:2]
     return premise.strip(), hypothesis.strip(), Y
