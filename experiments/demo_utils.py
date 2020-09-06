@@ -1,7 +1,7 @@
 import torch
 import pandas as pd
-from transformers import BertTokenizer
-from typing import List, Dict, Tuple, Optional, Callable
+from transformers import BertTokenizer, InputFeatures
+from typing import List, Dict, Tuple, Optional, Callable, Any
 
 from influence_utils import faiss_utils
 from influence_utils import parallel
@@ -16,7 +16,7 @@ KNN_K = 1000
 NUM_EXAMPLES_TO_SHOW = 3
 
 
-class DemoInfluenceHelper(object):
+class ExperimentalDemoInfluenceHelper(object):
     def __init__(
         self,
         train_task_name: str,
@@ -145,48 +145,55 @@ class DemoInfluenceHelper(object):
             train_indices_to_include=KNN_indices,
             precomputed_s_test=None)
 
-        return influences
+        return inputs, influences
 
 
 def print_influential_examples(
         tokenizer: BertTokenizer,
+        test_input: Dict[str, Any],
         influences: Dict[int, float],
         train_dataset: data_utils.CustomGlueDataset,
-        printer_fn: Optional[Callable] = None
+        printer_fn: Callable
 ) -> None:
 
-    if printer_fn is None:
-        printer_fn = print
+    def _print_example(
+            feature: Optional[InputFeatures] = None,
+            inputs: Optional[Dict[str, torch.Tensor]] = None,
+    ) -> None:
+        # Assume `tokenizer` and `label_list` is shared
+        # across examples used here.
+        premise, hypothesis, label = (
+            mnli_utils.get_data_from_features_or_inputs(
+                tokenizer=tokenizer,
+                label_list=train_dataset.label_list,
+                feature=feature,
+                inputs=inputs))
 
-    def _print_influential_examples(sorted_indices: List[int], label: str) -> None:
-        if printer_fn is None:
-            raise ValueError
+        printer_fn(f"\t**Premise**")
+        printer_fn(premise)
+        printer_fn(f"\t**Hypothesis**")
+        printer_fn(hypothesis)
+        printer_fn(f"\t**Label**\n")
+        printer_fn(label)
 
+    def _print_influential_examples(sorted_indices: List[int], tag: str) -> None:
         for i in range(NUM_EXAMPLES_TO_SHOW):
             influence_data_index = sorted_indices[i]
             influence_score = influences[influence_data_index]
-            premise, hypothesis, label = (
-                mnli_utils.get_inputs_from_features(
-                    tokenizer=tokenizer,
-                    label_list=train_dataset.label_list,
-                    feature=train_dataset[influence_data_index]))
+            printer_fn(f"### {i}-th {tag} Influential ({influence_score:.5f})")
+            _print_example(feature=train_dataset[influence_data_index], inputs=None)
 
-            printer_fn(f"### {i}-th {label} Influential ({influence_score:.2f})")
-            printer_fn(f"\t**Premise**")
-            printer_fn(premise)
-            printer_fn(f"\t**Hypothesis**")
-            printer_fn(hypothesis)
-            printer_fn(f"\t**Label**\n")
-            printer_fn(label)
+    printer_fn(f"### Inputs")
+    _print_example(feature=None, inputs=test_input)
 
     sorted_indices = misc_utils.sort_dict_keys_by_vals(influences)
     _print_influential_examples(
         sorted_indices=sorted_indices[::-1],
-        label="Positive")
+        tag="Positive")
 
     _print_influential_examples(
         sorted_indices=sorted_indices,
-        label="Negative")
+        tag="Negative")
 
 
 def load_dataset(name: str) -> pd.DataFrame:

@@ -8,7 +8,7 @@ st.title("Influence Demo")
 def setup():
     with st.spinner("Loading Model and Dataset"):
         data = demo_utils.load_dataset("hans")
-        helper = demo_utils.DemoInfluenceHelper(
+        helper = demo_utils.ExperimentalDemoInfluenceHelper(
             train_task_name="mnli-2",
             eval_task_name="hans",
             hans_heuristic="lexical_overlap")
@@ -16,10 +16,11 @@ def setup():
     return data, helper
 
 
-def run(index: int, helper: demo_utils.DemoInfluenceHelper):
+def run(index: int, helper: demo_utils.ExperimentalDemoInfluenceHelper):
     with st.spinner("Running Influence"):
-        influences = helper.run(index)
+        inputs, influences = helper.run(index)
     demo_utils.print_influential_examples(
+        test_input=inputs,
         tokenizer=helper._tokenizer,
         influences=influences,
         train_dataset=helper._train_dataset,
