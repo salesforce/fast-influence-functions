@@ -9,3 +9,4 @@ contexttimer
 pandas
 yagmail[all]
 scp
+streamlit
