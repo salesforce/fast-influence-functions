@@ -1,26 +1,13 @@
-import torch
-import numpy as np
-import graph_tool as gt
-from tqdm import tqdm, trange
-import matplotlib.pyplot as plt
-from scipy.optimize import minimize
-from graph_tool.draw import graph_draw
-from joblib import Parallel, delayed
-from transformers import BertTokenizer
-
+from transformers import (
+    BertTokenizer, Trainer, TrainingArguments)
 from typing import List, Dict, Tuple, Optional
+
 from influence_utils import faiss_utils
 from influence_utils import parallel
-from experiments.visualization_utils import (
-    get_circle_coordinates,
-    get_within_circle_constraint,
-    # distance_to_points_on_circle,
-    # distance_to_points_within_circle,
-    distance_to_points_within_circle_vectorized)
 from experiments import constants
 from experiments import misc_utils
-from experiments.hans_utils import HansHelper
-from transformers import Trainer, TrainingArguments
+from experiments import hans_utils
+
 from experiments import data_utils
 from experiments import mnli_utils
 
