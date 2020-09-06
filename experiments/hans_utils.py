@@ -7,9 +7,6 @@ from experiments import misc_utils
 from transformers import default_data_collator
 from typing import List, Union, Iterable, Dict, Any, Tuple, Optional
 
-HANS_TRAIN_FILE_NAME = "/export/home/Data/HANS/heuristics_train_set.txt"
-HANS_EVAL_FILE_NAME = "/export/home/Data/HANS/heuristics_evaluation_set.txt"
-
 
 class SubsetDataset(torch.utils.data.Dataset):
     def __init__(self,
