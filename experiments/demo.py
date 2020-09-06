@@ -67,7 +67,7 @@ def main(
         if hans_heuristic is None:
             raise ValueError("`hans_heuristic` cannot be None for now")
 
-        hans_helper = HansHelper(
+        hans_helper = hans_utils.HansHelper(
             hans_train_dataset=None,
             hans_eval_dataset=eval_dataset)
 
