@@ -117,6 +117,10 @@ class DemoInfluenceHelper(object):
             if index != chosen_index:
                 break
 
+        for k, v in inputs.items():
+            if isinstance(v, torch.Tensor):
+                inputs[k] = v.cuda()
+
         print(f"#{index}")
         if self._faiss_index is not None:
             features = misc_utils.compute_BERT_CLS_feature(
