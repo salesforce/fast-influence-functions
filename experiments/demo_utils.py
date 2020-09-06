@@ -102,7 +102,7 @@ class ExperimentalDemoInfluenceHelper(object):
 
     def run(self, chosen_index: int):
         for index, inputs in enumerate(self._eval_instance_data_loader):
-            if index != chosen_index:
+            if index == chosen_index:
                 break
 
         for k, v in inputs.items():
