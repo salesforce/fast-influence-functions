@@ -1,16 +1,17 @@
+import torch
 import pandas as pd
 from transformers import (
     BertTokenizer, Trainer, TrainingArguments)
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Callable
 
 from influence_utils import faiss_utils
 from influence_utils import parallel
 from experiments import constants
 from experiments import misc_utils
 from experiments import hans_utils
-
 from experiments import data_utils
 from experiments import mnli_utils
+from influence_utils import nn_influence_utils
 
 KNN_K = 1000
 NUM_EXAMPLES_TO_SHOW = 3
@@ -110,6 +111,7 @@ class DemoInfluenceHelper(object):
             s_test_num_samples = 1000
 
         self._model = model
+        self._tokenizer = tokenizer
         self._faiss_index = faiss_index
         self._train_dataset = train_dataset
         self._params_filter = params_filter
@@ -134,11 +136,21 @@ class DemoInfluenceHelper(object):
         else:
             KNN_indices = None
 
-        influences, _ = parallel.compute_influences_parallel(
-            # Avoid clash with main process
-            device_ids=[0],
-            train_dataset=self._train_dataset,
+        batch_train_data_loader = misc_utils.get_dataloader(
+            self._train_dataset,
+            batch_size=128,
+            random=True)
+
+        instance_train_data_loader = misc_utils.get_dataloader(
+            self._train_dataset,
             batch_size=1,
+            random=False)
+
+        influences, _, _ = nn_influence_utils.compute_influences(
+            n_gpu=1,
+            device=torch.device("cuda"),
+            batch_train_data_loader=batch_train_data_loader,
+            instance_train_data_loader=instance_train_data_loader,
             model=self._model,
             test_inputs=inputs,
             params_filter=self._params_filter,
@@ -148,8 +160,7 @@ class DemoInfluenceHelper(object):
             s_test_scale=self._s_test_scale,
             s_test_num_samples=self._s_test_num_samples,
             train_indices_to_include=KNN_indices,
-            return_s_test=False,
-            debug=False)
+            precomputed_s_test=None)
 
         return influences
 
@@ -158,7 +169,12 @@ def print_most_influential_examples(
         tokenizer: BertTokenizer,
         influences: Dict[int, float],
         train_dataset: data_utils.CustomGlueDataset,
+        printer_fn: Optional[Callable] = None
 ) -> None:
+
+    if printer_fn is None:
+        printer_fn = print
+
     sorted_indices = misc_utils.sort_dict_keys_by_vals(influences)
     for i in range(NUM_EXAMPLES_TO_SHOW):
         premise, hypothesis, label = mnli_utils.get_inputs_from_features(
@@ -166,10 +182,10 @@ def print_most_influential_examples(
             label_list=train_dataset.label_list,
             feature=train_dataset[sorted_indices[i]])
 
-        print(f"Most {i}-th influential")
-        print(f"\tP:{premise}")
-        print(f"\tH:{hypothesis}")
-        print(f"\tL:{label}")
+        printer_fn(f"Most {i}-th influential")
+        printer_fn(f"\tP:{premise}")
+        printer_fn(f"\tH:{hypothesis}")
+        printer_fn(f"\tL:{label}")
 
 
 def load_dataset(name: str) -> pd.DataFrame:
