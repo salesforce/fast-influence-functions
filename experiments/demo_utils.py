@@ -80,16 +80,6 @@ class DemoInfluenceHelper(object):
                 batch_size=1,
                 random=False)
 
-        # Data-points where the model got wrong
-        wrong_input_collections = []
-        for i, test_inputs in enumerate(eval_instance_data_loader):
-            logits, labels, step_eval_loss = misc_utils.predict(
-                trainer=trainer,
-                model=model,
-                inputs=test_inputs)
-            if logits.argmax(axis=-1).item() != labels.item():
-                wrong_input_collections.append(test_inputs)
-
         params_filter = [
             n for n, p in model.named_parameters()
             if not p.requires_grad]
@@ -114,15 +104,16 @@ class DemoInfluenceHelper(object):
         self._tokenizer = tokenizer
         self._faiss_index = faiss_index
         self._train_dataset = train_dataset
+        self._eval_instance_data_loader = eval_instance_data_loader
+
         self._params_filter = params_filter
         self._weight_decay_ignores = weight_decay_ignores
         self._s_test_damp = s_test_damp
         self._s_test_scale = s_test_scale
         self._s_test_num_samples = s_test_num_samples
-        self._wrong_input_collections = wrong_input_collections
 
     def run(self, chosen_index: int):
-        for index, inputs in enumerate(self._wrong_input_collections):
+        for index, inputs in enumerate(self._eval_instance_data_loader):
             if index != chosen_index:
                 break
 
@@ -138,7 +129,7 @@ class DemoInfluenceHelper(object):
 
         batch_train_data_loader = misc_utils.get_dataloader(
             self._train_dataset,
-            batch_size=128,
+            batch_size=1,
             random=True)
 
         instance_train_data_loader = misc_utils.get_dataloader(
@@ -182,10 +173,10 @@ def print_most_influential_examples(
             label_list=train_dataset.label_list,
             feature=train_dataset[sorted_indices[i]])
 
-        printer_fn(f"Most {i}-th influential")
-        printer_fn(f"\tP:{premise}")
-        printer_fn(f"\tH:{hypothesis}")
-        printer_fn(f"\tL:{label}")
+        printer_fn(f"### Most {i}-th influential")
+        printer_fn(f"\t**Premise**\n{premise}")
+        printer_fn(f"\t**Hypothesis**:{hypothesis}")
+        printer_fn(f"\t**Label**:{label}\n")
 
 
 def load_dataset(name: str) -> pd.DataFrame:
