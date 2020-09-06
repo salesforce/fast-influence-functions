@@ -1,3 +1,4 @@
+import pandas as pd
 from transformers import (
     BertTokenizer, Trainer, TrainingArguments)
 from typing import List, Dict, Tuple, Optional
@@ -155,3 +156,14 @@ def print_most_influential_examples(
         print(f"\tP:{premise}")
         print(f"\tH:{hypothesis}")
         print(f"\tL:{label}")
+
+
+def load_dataset(name: str) -> pd.DataFrame:
+    if name not in ["mnli"]:
+        raise ValueError
+
+    if name == "mnli":
+        file_name = "/export/share/hguo/Data/Glue/MNLI/dev_matched.tsv"
+        columns = ["index", "sentence1", "sentence2", "gold_label"]
+    data = pd.read_csv(file_name, sep="\t")
+    return data[columns]
