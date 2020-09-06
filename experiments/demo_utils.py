@@ -172,15 +172,39 @@ def print_most_influential_examples(
 
     sorted_indices = misc_utils.sort_dict_keys_by_vals(influences)
     for i in range(NUM_EXAMPLES_TO_SHOW):
-        premise, hypothesis, label = mnli_utils.get_inputs_from_features(
-            tokenizer=tokenizer,
-            label_list=train_dataset.label_list,
-            feature=train_dataset[sorted_indices[i]])
+        positive_influence_data_index = sorted_indices[-i]
+        negative_influence_data_index = sorted_indices[i]
 
-        printer_fn(f"### Most {i}-th influential")
-        printer_fn(f"\t**Premise**\n{premise}")
-        printer_fn(f"\t**Hypothesis**:{hypothesis}")
-        printer_fn(f"\t**Label**:{label}\n")
+        positive_influence_score = influences[positive_influence_data_index]
+        negative_influence_score = influences[negative_influence_data_index]
+
+        positive_premise, positive_hypothesis, positive_label = (
+            mnli_utils.get_inputs_from_features(
+                tokenizer=tokenizer,
+                label_list=train_dataset.label_list,
+                feature=train_dataset[positive_influence_data_index]))
+
+        negative_premise, negative_hypothesis, negative_label = (
+            mnli_utils.get_inputs_from_features(
+                tokenizer=tokenizer,
+                label_list=train_dataset.label_list,
+                feature=train_dataset[negative_influence_data_index]))
+
+        printer_fn(f"### {i}-th Positive Influential ({positive_influence_score:.2f})")
+        printer_fn(f"\t**Premise**")
+        printer_fn(positive_premise)
+        printer_fn(f"\t**Hypothesis**")
+        printer_fn(positive_hypothesis)
+        printer_fn(f"\t**Label**\n")
+        printer_fn(positive_label)
+
+        printer_fn(f"### {i}-th Positive Influential ({negative_influence_score:.2f})")
+        printer_fn(f"\t**Premise**")
+        printer_fn(negative_premise)
+        printer_fn(f"\t**Hypothesis**")
+        printer_fn(negative_hypothesis)
+        printer_fn(f"\t**Label**\n")
+        printer_fn(negative_label)
 
 
 def load_dataset(name: str) -> pd.DataFrame:
