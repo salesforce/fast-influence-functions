@@ -1,7 +1,6 @@
 import torch
 import pandas as pd
-from transformers import (
-    BertTokenizer, Trainer, TrainingArguments)
+from transformers import BertTokenizer
 from typing import List, Dict, Tuple, Optional, Callable
 
 from influence_utils import faiss_utils
@@ -47,18 +46,6 @@ class DemoInfluenceHelper(object):
             faiss_index.load(constants.MNLI2_FAISS_INDEX_PATH)
         else:
             faiss_index = None
-
-        trainer = Trainer(
-            model=model,
-            args=TrainingArguments(
-                output_dir="./tmp-output",
-                per_device_train_batch_size=128,
-                per_device_eval_batch_size=128,
-                learning_rate=5e-5,
-                logging_steps=100),
-            train_dataset=train_dataset,
-            eval_dataset=eval_dataset,
-        )
 
         if eval_task_name in ["mnli-2"]:
             eval_instance_data_loader = misc_utils.get_dataloader(
@@ -160,7 +147,7 @@ class DemoInfluenceHelper(object):
         return influences
 
 
-def print_most_influential_examples(
+def print_influential_examples(
         tokenizer: BertTokenizer,
         influences: Dict[int, float],
         train_dataset: data_utils.CustomGlueDataset,
@@ -170,41 +157,35 @@ def print_most_influential_examples(
     if printer_fn is None:
         printer_fn = print
 
+    def _print_influential_examples(sorted_indices: List[int], label: str) -> None:
+        if printer_fn is None:
+            raise ValueError
+
+        for i in range(NUM_EXAMPLES_TO_SHOW):
+            influence_data_index = sorted_indices[i]
+            influence_score = influences[influence_data_index]
+            premise, hypothesis, label = (
+                mnli_utils.get_inputs_from_features(
+                    tokenizer=tokenizer,
+                    label_list=train_dataset.label_list,
+                    feature=train_dataset[influence_data_index]))
+
+            printer_fn(f"### {i}-th {label} Influential ({influence_score:.2f})")
+            printer_fn(f"\t**Premise**")
+            printer_fn(premise)
+            printer_fn(f"\t**Hypothesis**")
+            printer_fn(hypothesis)
+            printer_fn(f"\t**Label**\n")
+            printer_fn(label)
+
     sorted_indices = misc_utils.sort_dict_keys_by_vals(influences)
-    for i in range(NUM_EXAMPLES_TO_SHOW):
-        positive_influence_data_index = sorted_indices[-i]
-        negative_influence_data_index = sorted_indices[i]
+    _print_influential_examples(
+        sorted_indices=sorted_indices[::-1],
+        label="Positive")
 
-        positive_influence_score = influences[positive_influence_data_index]
-        negative_influence_score = influences[negative_influence_data_index]
-
-        positive_premise, positive_hypothesis, positive_label = (
-            mnli_utils.get_inputs_from_features(
-                tokenizer=tokenizer,
-                label_list=train_dataset.label_list,
-                feature=train_dataset[positive_influence_data_index]))
-
-        negative_premise, negative_hypothesis, negative_label = (
-            mnli_utils.get_inputs_from_features(
-                tokenizer=tokenizer,
-                label_list=train_dataset.label_list,
-                feature=train_dataset[negative_influence_data_index]))
-
-        printer_fn(f"### {i}-th Positive Influential ({positive_influence_score:.2f})")
-        printer_fn(f"\t**Premise**")
-        printer_fn(positive_premise)
-        printer_fn(f"\t**Hypothesis**")
-        printer_fn(positive_hypothesis)
-        printer_fn(f"\t**Label**\n")
-        printer_fn(positive_label)
-
-        printer_fn(f"### {i}-th Positive Influential ({negative_influence_score:.2f})")
-        printer_fn(f"\t**Premise**")
-        printer_fn(negative_premise)
-        printer_fn(f"\t**Hypothesis**")
-        printer_fn(negative_hypothesis)
-        printer_fn(f"\t**Label**\n")
-        printer_fn(negative_label)
+    _print_influential_examples(
+        sorted_indices=sorted_indices,
+        label="Negative")
 
 
 def load_dataset(name: str) -> pd.DataFrame:
