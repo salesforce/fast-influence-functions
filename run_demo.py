@@ -8,7 +8,10 @@ st.title("Influence Demo")
 def setup():
     with st.spinner("Loading Model and Dataset"):
         data = demo_utils.load_dataset("hans")
-        helper = demo_utils.DemoInfluenceHelper("mnli-2", "hans")
+        helper = demo_utils.DemoInfluenceHelper(
+            train_task_name="mnli-2",
+            eval_task_name="hans",
+            hans_heuristic="lexical_overlap")
 
     return data, helper
 
