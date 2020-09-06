@@ -48,13 +48,13 @@ def get_data_from_features_or_inputs(
     if feature is not None and inputs is None:
         inputs = default_data_collator([feature])
 
-    if feature is None and inputs is not None:
+    elif feature is None and inputs is not None:
         pass
 
-    if feature is None and inputs is None:
+    elif feature is None and inputs is None:
         raise ValueError
 
-    if feature is not None and inputs is not None:
+    elif feature is not None and inputs is not None:
         raise ValueError
 
     X, Y = decode_one_example(
