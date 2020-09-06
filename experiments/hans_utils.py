@@ -2,13 +2,11 @@ import torch
 import numpy as np
 import pandas as pd
 
+from experiments import constants
 from experiments import data_utils
 from experiments import misc_utils
 from transformers import default_data_collator
 from typing import List, Union, Iterable, Dict, Any, Tuple, Optional
-
-HANS_TRAIN_FILE_NAME = "/export/home/Data/HANS/heuristics_train_set.txt"
-HANS_EVAL_FILE_NAME = "/export/home/Data/HANS/heuristics_evaluation_set.txt"
 
 
 class SubsetDataset(torch.utils.data.Dataset):
@@ -34,8 +32,8 @@ class HansHelper(object):
             hans_train_dataset: Optional[data_utils.CustomGlueDataset] = None,
             hans_eval_dataset: Optional[data_utils.CustomGlueDataset] = None) -> None:
 
-        self._hans_train_df = pd.read_csv(HANS_TRAIN_FILE_NAME, sep="\t")
-        self._hans_eval_df = pd.read_csv(HANS_EVAL_FILE_NAME, sep="\t")
+        self._hans_train_df = pd.read_csv(constants.HANS_TRAIN_FILE_NAME, sep="\t")
+        self._hans_eval_df = pd.read_csv(constants.HANS_EVAL_FILE_NAME, sep="\t")
         self._hans_train_dataset = hans_train_dataset
         self._hans_eval_dataset = hans_eval_dataset
 
