@@ -32,6 +32,7 @@ class DemoInfluenceHelper(object):
 
         tokenizer, model = misc_utils.create_tokenizer_and_model(
             constants.MNLI2_MODEL_PATH)
+        model.cuda()
 
         train_dataset, _ = misc_utils.create_datasets(
             task_name=train_task_name,
