@@ -45,6 +45,8 @@ Switching gear towards downstream tasks
 * Removed deprecated `language_modeling.py`
 * Added `run_experiments.py` and `scripts/run_experiments.sh` for non-interactive experiments running.
 * Copied the GLUE data download script and paste them into `scripts/down_glue_data.py`.
+* Edited the configuration files for running in different environments.
+* Added demo. To run the demo, do `~/.local/bin/streamlit run run_demo.py`
 
 ### Minor Changes
 * Added the missing `.gitignore`.
