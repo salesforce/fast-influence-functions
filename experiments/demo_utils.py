@@ -3,14 +3,14 @@ import pandas as pd
 from transformers import BertTokenizer, InputFeatures
 from typing import List, Dict, Tuple, Optional, Callable, Any
 
-from influence_utils import faiss_utils
 from influence_utils import parallel
+from influence_utils import faiss_utils
+from influence_utils import nn_influence_utils
 from experiments import constants
 from experiments import misc_utils
 from experiments import hans_utils
 from experiments import data_utils
 from experiments import mnli_utils
-from influence_utils import nn_influence_utils
 
 KNN_K = 1000
 NUM_EXAMPLES_TO_SHOW = 3
