@@ -190,11 +190,16 @@ def print_influential_examples(
 
 
 def load_dataset(name: str) -> pd.DataFrame:
-    if name not in ["mnli"]:
+    if name not in ["mnli", "mnli-2", "hans"]:
         raise ValueError
 
-    if name == "mnli":
+    if name in ["mnli", "mnli-2"]:
         file_name = "/export/share/hguo/Data/Glue/MNLI/dev_matched.tsv"
         columns = ["index", "sentence1", "sentence2", "gold_label"]
+
+    if name == "hans":
+        file_name = "/export/share/hguo/Data/HANS/heuristics_evaluation_set.txt"
+        columns = ["heuristic", "sentence1", "sentence2", "gold_label"]
+
     data = pd.read_csv(file_name, sep="\t")
     return data[columns]

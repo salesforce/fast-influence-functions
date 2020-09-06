@@ -7,8 +7,8 @@ st.title("Influence Demo")
 
 def setup():
     with st.spinner("Loading Model and Dataset"):
-        data = demo_utils.load_dataset("mnli")
-        helper = demo_utils.DemoInfluenceHelper("mnli-2", "mnli-2")
+        data = demo_utils.load_dataset("hans")
+        helper = demo_utils.DemoInfluenceHelper("mnli-2", "hans")
 
     return data, helper
 
@@ -16,7 +16,7 @@ def setup():
 def run(index: int, helper: demo_utils.DemoInfluenceHelper):
     with st.spinner("Running Influence"):
         influences = helper.run(index)
-    demo_utils.print_most_influential_examples(
+    demo_utils.print_influential_examples(
         tokenizer=helper._tokenizer,
         influences=influences,
         train_dataset=helper._train_dataset,
