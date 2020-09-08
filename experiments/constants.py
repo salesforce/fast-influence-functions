@@ -14,6 +14,8 @@ MNLI_FAISS_INDEX_PATH = "/export/share/hguo/Experiments/20200713/MNLI.index"
 HANS_FAISS_INDEX_PATH = "/export/share/hguo/Experiments/20200908/HANS.index"
 # Trained and used in MNLI-2
 MNLI2_FAISS_INDEX_PATH = "/export/share/hguo/Experiments/20200805/MNLI.index"
+# Trained on MNLI2 and used in HANS
+MNLI2_HANS_FAISS_INDEX_PATH = "/export/share/hguo/Experiments/20200908/MNLI2-HANS.index"
 # Trained on HANS and used in MNLI2
 HANS_MNLI2_FAISS_INDEX_PATH = "/export/share/hguo/Experiments/20200908/HANS-MNLI2.index"
 

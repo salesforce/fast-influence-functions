@@ -58,6 +58,9 @@ class ExperimentalDemoInfluenceHelper(object):
         elif trained_on_task_name == "hans" and train_task_name == "hans":
             faiss_index = faiss_utils.FAISSIndex(768, "Flat")
             faiss_index.load(constants.HANS_FAISS_INDEX_PATH)
+        elif trained_on_task_name == "mnli-2" and eval_task_name == "hans":
+            faiss_index = faiss_utils.FAISSIndex(768, "Flat")
+            faiss_index.load(constants.MNLI2_HANS_FAISS_INDEX_PATH)
         elif trained_on_task_name == "hans" and train_task_name == "mnli-2":
             faiss_index = faiss_utils.FAISSIndex(768, "Flat")
             faiss_index.load(constants.HANS_MNLI2_FAISS_INDEX_PATH)
