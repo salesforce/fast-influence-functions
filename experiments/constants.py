@@ -8,9 +8,15 @@ MNLI_MODEL_PATH = "/export/share/hguo/Experiments/20200706/"
 HANS_MODEL_PATH = "/export/share/hguo/Experiments/20200907/"
 MNLI2_MODEL_PATH = "/export/share/hguo/Experiments/20200801/"
 
+# Trained and used in MNLI
 MNLI_FAISS_INDEX_PATH = "/export/share/hguo/Experiments/20200713/MNLI.index"
+# Trained and used in HANS
 HANS_FAISS_INDEX_PATH = "/export/share/hguo/Experiments/20200908/HANS.index"
+# Trained and used in MNLI-2
 MNLI2_FAISS_INDEX_PATH = "/export/share/hguo/Experiments/20200805/MNLI.index"
+# Trained on HANS and used in MNLI2
+HANS_MNLI2_FAISS_INDEX_PATH = "/export/share/hguo/Experiments/20200908/HANS-MNLI2.index"
+
 MNLI_TRAIN_INPUT_COLLECTIONS_PATH = "/export/share/hguo/Experiments/20200706/train_inputs_collections.tmp.pt.full"
 
 HANS_DATA_DIR = "/export/share/hguo/Data/HANS/"
