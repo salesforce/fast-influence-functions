@@ -5,6 +5,7 @@ import os
 WEIGHT_DECAY = 0.005
 
 MNLI_MODEL_PATH = "/export/share/hguo/Experiments/20200706/"
+HANS_MODEL_PATH = "/export/share/hguo/Experiments/20200907/"
 MNLI2_MODEL_PATH = "/export/share/hguo/Experiments/20200801/"
 MNLI_FAISS_INDEX_PATH = "/export/share/hguo/Experiments/20200713/MNLI.index"
 MNLI2_FAISS_INDEX_PATH = "/export/share/hguo/Experiments/20200805/MNLI.index"
