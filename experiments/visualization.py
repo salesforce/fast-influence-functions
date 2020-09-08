@@ -157,6 +157,11 @@ def main(
         s_test_scale = 1e6
         s_test_num_samples = 1000
 
+    if trained_on_task_name == "hans" and train_task_name == "mnli-2":
+        s_test_damp = 5e-3
+        s_test_scale = 1e6
+        s_test_num_samples = 2000
+
     influences_collections = []
     for index, inputs in enumerate(wrong_input_collections[:num_eval_to_collect]):
         print(f"#{index}")
