@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-import graph_tool as gt
 from tqdm import tqdm, trange
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
@@ -23,6 +22,15 @@ from experiments import remote_utils
 from experiments.hans_utils import HansHelper
 from transformers import Trainer, TrainingArguments
 
+
+try:
+    import graph_tool as gt
+    import gt.Graph as gt_Graph_t
+except ModuleNotFoundError:
+    # We do not need `graph_tool` unless
+    # visualization is to be created
+    gt = None
+    gt_Graph_t = "gt.Graph"
 
 KNN_K = 1000
 
@@ -268,7 +276,7 @@ def get_datapoints_map(
 
 def get_graph(
         influences_collections_list: List[List[Dict[int, float]]]
-) -> gt.Graph:
+) -> gt_Graph_t:
 
     influences_collections_list_flatten = []
     for influences_collections in influences_collections_list:
