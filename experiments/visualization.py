@@ -18,6 +18,7 @@ from experiments.visualization_utils import (
     distance_to_points_within_circle_vectorized)
 from experiments import constants
 from experiments import misc_utils
+from experiments import remote_utils
 from experiments.hans_utils import HansHelper
 from transformers import Trainer, TrainingArguments
 
@@ -184,6 +185,10 @@ def main(
             debug=False)
 
         influences_collections.append(influences)
+
+    remote_utils.save_and_mirror_scp_to_remote(
+        object_to_save=influences_collections,
+        file_name=f"visualization-influences-collections.{num_eval_to_collect}.pth")
 
     return influences_collections
 

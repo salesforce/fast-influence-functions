@@ -3,9 +3,11 @@ from typing import Optional, Dict
 from experiments import mnli
 from experiments import s_test_speedup
 from experiments import remote_utils
+from experiments import visualization
 
 NUM_KNN_RECALL_EXPERIMENTS = 50
 NUM_STEST_EXPERIMENTS = 10
+NUM_VISUALIZATION_EXPERIMENTS = 100
 
 
 def KNN_recall_experiments(
@@ -44,6 +46,23 @@ def s_test_speed_quality_tradeoff_experiments(
     s_test_speedup.main(
         mode="only-incorrect",
         num_examples_to_test=num_experiments)
+
+
+def visualization_experiments(
+        num_experiments: Optional[int] = None
+) -> None:
+    """Experiments for Visualizing Effects"""
+    print("RUNNING `visualization_experiments`")
+
+    if num_experiments is None:
+        num_experiments = NUM_VISUALIZATION_EXPERIMENTS
+
+    visualization.main(
+        train_task_name="hans",
+        eval_task_name="hans",
+        num_eval_to_collect=num_experiments,
+        hans_heuristic="lexical_overlap",
+        trained_on_task_name="hans")
 
 
 # ------------------------------------------------------------------
