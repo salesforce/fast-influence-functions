@@ -214,7 +214,11 @@ def main(
 
     remote_utils.save_and_mirror_scp_to_remote(
         object_to_save=influences_collections,
-        file_name=f"visualization-influences-collections.{num_eval_to_collect}.pth")
+        file_name=(
+            f"visualization.{num_eval_to_collect}"
+            f".{train_task_name}-{eval_task_name}"
+            f"-{hans_heuristic}-{trained_on_task_name}"
+            f".{use_parallel}.pth"))
 
     return influences_collections
 
