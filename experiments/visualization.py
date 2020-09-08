@@ -30,6 +30,7 @@ def main(
     eval_task_name: str,
     num_eval_to_collect: int,
     hans_heuristic: Optional[str] = None,
+    trained_on_task_name: Optional[str] = None,
 ) -> List[Dict[int, float]]:
 
     if train_task_name not in ["mnli-2", "hans"]:
@@ -38,8 +39,24 @@ def main(
     if eval_task_name not in ["mnli-2", "hans"]:
         raise ValueError
 
-    tokenizer, model = misc_utils.create_tokenizer_and_model(
-        constants.MNLI2_MODEL_PATH)
+    if trained_on_task_name is None:
+        # The task the model was trained on
+        # can be different from `train_task_name`
+        # which is used to determine on which the
+        # influence values will be computed.
+        trained_on_task_name = train_task_name
+
+    if trained_on_task_name not in ["mnli-2", "hans"]:
+        raise ValueError
+
+    # `trained_on_task_name` determines the model to load
+    if trained_on_task_name in ["mnli-2"]:
+        tokenizer, model = misc_utils.create_tokenizer_and_model(
+            constants.MNLI2_MODEL_PATH)
+
+    if trained_on_task_name in ["hans"]:
+        tokenizer, model = misc_utils.create_tokenizer_and_model(
+            constants.HANS_MODEL_PATH)
 
     train_dataset, _ = misc_utils.create_datasets(
         task_name=train_task_name,
@@ -49,9 +66,12 @@ def main(
         task_name=eval_task_name,
         tokenizer=tokenizer)
 
-    if train_task_name == "mnli-2":
+    if trained_on_task_name == "mnli-2" and train_task_name == "mnli-2":
         faiss_index = faiss_utils.FAISSIndex(768, "Flat")
         faiss_index.load(constants.MNLI2_FAISS_INDEX_PATH)
+    elif trained_on_task_name == "hans" and train_task_name == "hans":
+        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
+        faiss_index.load(constants.HANS_FAISS_INDEX_PATH)
     else:
         faiss_index = None
 
