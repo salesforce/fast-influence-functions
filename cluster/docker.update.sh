@@ -19,6 +19,10 @@ git checkout -- cluster/docker.run.sh  # this is important
 sed -i -e 's@IMAGE_TAG@'"$HeadCommitSHA"'@' cluster/docker.run.sh
 
 # Modify the tag in the related files
+git checkout -- cluster/slurm.interactive.sh  # this is important
+sed -i -e 's@IMAGE_TAG@'"$HeadCommitSHA"'@' cluster/slurm.interactive.sh
+
+# Modify the tag in the related files
 git checkout -- cluster/kube.jupyter.yaml  # this is important
 sed -i -e 's@IMAGE_TAG@'"$HeadCommitSHA"'@' cluster/kube.jupyter.yaml
 
