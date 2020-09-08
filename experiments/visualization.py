@@ -4,12 +4,13 @@ import graph_tool as gt
 from tqdm import tqdm, trange
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
-from graph_tool.draw import graph_draw
-from joblib import Parallel, delayed
+# from graph_tool.draw import graph_draw
+# from joblib import Parallel, delayed
 
 from typing import List, Dict, Tuple, Optional
 from influence_utils import faiss_utils
 from influence_utils import parallel
+from influence_utils import nn_influence_utils
 from experiments.visualization_utils import (
     get_circle_coordinates,
     get_within_circle_constraint,
@@ -30,6 +31,7 @@ def main(
     train_task_name: str,
     eval_task_name: str,
     num_eval_to_collect: int,
+    use_parallel: Optional[bool] = True,
     hans_heuristic: Optional[str] = None,
     trained_on_task_name: Optional[str] = None,
 ) -> List[Dict[int, float]]:
@@ -151,38 +153,50 @@ def main(
         else:
             KNN_indices = None
 
-        # influences, _, _ = nn_influence_utils.compute_influences(
-        #     n_gpu=1,
-        #     device=torch.device("cuda"),
-        #     batch_train_data_loader=batch_train_data_loader,
-        #     instance_train_data_loader=instance_train_data_loader,
-        #     model=model,
-        #     test_inputs=inputs,
-        #     params_filter=params_filter,
-        #     weight_decay=constants.WEIGHT_DECAY,
-        #     weight_decay_ignores=weight_decay_ignores,
-        #     s_test_damp=s_test_damp,
-        #     s_test_scale=s_test_scale,
-        #     s_test_num_samples=s_test_num_samples,
-        #     train_indices_to_include=KNN_indices,
-        #     precomputed_s_test=None)
+        if not use_parallel:
+            model.cuda()
+            batch_train_data_loader = misc_utils.get_dataloader(
+                train_dataset,
+                batch_size=1,
+                random=True)
 
-        influences, _ = parallel.compute_influences_parallel(
-            # Avoid clash with main process
-            device_ids=[0, 1, 2, 3],
-            train_dataset=train_dataset,
-            batch_size=1,
-            model=model,
-            test_inputs=inputs,
-            params_filter=params_filter,
-            weight_decay=constants.WEIGHT_DECAY,
-            weight_decay_ignores=weight_decay_ignores,
-            s_test_damp=s_test_damp,
-            s_test_scale=s_test_scale,
-            s_test_num_samples=s_test_num_samples,
-            train_indices_to_include=KNN_indices,
-            return_s_test=False,
-            debug=False)
+            instance_train_data_loader = misc_utils.get_dataloader(
+                train_dataset,
+                batch_size=1,
+                random=False)
+
+            influences, _, _ = nn_influence_utils.compute_influences(
+                n_gpu=1,
+                device=torch.device("cuda"),
+                batch_train_data_loader=batch_train_data_loader,
+                instance_train_data_loader=instance_train_data_loader,
+                model=model,
+                test_inputs=inputs,
+                params_filter=params_filter,
+                weight_decay=constants.WEIGHT_DECAY,
+                weight_decay_ignores=weight_decay_ignores,
+                s_test_damp=s_test_damp,
+                s_test_scale=s_test_scale,
+                s_test_num_samples=s_test_num_samples,
+                train_indices_to_include=KNN_indices,
+                precomputed_s_test=None)
+        else:
+            influences, _ = parallel.compute_influences_parallel(
+                # Avoid clash with main process
+                device_ids=[0, 1, 2, 3],
+                train_dataset=train_dataset,
+                batch_size=1,
+                model=model,
+                test_inputs=inputs,
+                params_filter=params_filter,
+                weight_decay=constants.WEIGHT_DECAY,
+                weight_decay_ignores=weight_decay_ignores,
+                s_test_damp=s_test_damp,
+                s_test_scale=s_test_scale,
+                s_test_num_samples=s_test_num_samples,
+                train_indices_to_include=KNN_indices,
+                return_s_test=False,
+                debug=False)
 
         influences_collections.append(influences)
 

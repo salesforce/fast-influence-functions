@@ -82,4 +82,4 @@ def check_KNN_recall_local_remote_match(
 if __name__ == "__main__":
     # Make sure the environment is properly setup
     remote_utils.setup_and_verify_environment()
-    KNN_recall_experiments()
+    visualization_experiments()
