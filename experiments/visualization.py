@@ -131,11 +131,15 @@ def main(
         if not p.requires_grad]
 
     # Other settings are not supported as of now
-    if (trained_on_task_name == "mnli-2" and eval_task_name == "mnli-2") or (
-            trained_on_task_name == "hans" and eval_task_name == "hans"):
+    if trained_on_task_name == "mnli-2" and eval_task_name == "mnli-2":
         s_test_damp = 5e-3
         s_test_scale = 1e4
         s_test_num_samples = 1000
+
+    if trained_on_task_name == "hans" and eval_task_name == "hans":
+        s_test_damp = 5e-3
+        s_test_scale = 1e6
+        s_test_num_samples = 2000
 
     if trained_on_task_name == "mnli-2" and eval_task_name == "hans":
         s_test_damp = 5e-3
