@@ -8,15 +8,10 @@ from typing import Union, Dict, Any, List
 from transformers import default_data_collator
 
 from influence_utils import parallel
+from influence_utils import faiss_utils
 from influence_utils import nn_influence_utils
-from experiments.mnli_utils import (
-    MNLI2_MODEL_PATH,
-    predict,
-    create_datasets,
-    create_tokenizer_and_model)
-from experiments.mnli import (
-    WEIGHT_DECAY,
-    sort_dict_keys_by_vals)
+from experiments import constants
+from experiments import misc_utils
 from experiments.hans_utils import HansHelper
 from transformers import TrainingArguments
 from experiments.data_utils import (
@@ -29,16 +24,16 @@ EXPERIMENT_TYPES = ["most-helpful", "most-harmful", "random"]
 
 
 def main() -> Dict[str, List[Dict[str, Any]]]:
-    task_tokenizer, task_model = create_tokenizer_and_model(
-        MNLI2_MODEL_PATH)
+    task_tokenizer, task_model = misc_utils.create_tokenizer_and_model(
+        constants.MNLI2_MODEL_PATH)
 
     (mnli_train_dataset,
-     mnli_eval_dataset) = create_datasets(
+     mnli_eval_dataset) = misc_utils.create_datasets(
         task_name="mnli-2",
         tokenizer=task_tokenizer)
 
     (hans_train_dataset,
-     hans_eval_dataset) = create_datasets(
+     hans_eval_dataset) = misc_utils.create_datasets(
         task_name="hans",
         tokenizer=task_tokenizer)
 
@@ -127,7 +122,7 @@ def one_experiment(
             model=task_model,
             test_inputs=hans_eval_heuristic_inputs,
             params_filter=params_filter,
-            weight_decay=WEIGHT_DECAY,
+            weight_decay=constants.WEIGHT_DECAY,
             weight_decay_ignores=weight_decay_ignores,
             s_test_damp=5e-3,
             s_test_scale=1e6,
@@ -136,7 +131,7 @@ def one_experiment(
             return_s_test=True,
             debug=False)
 
-        sorted_indices = sort_dict_keys_by_vals(influences)
+        sorted_indices = misc_utils.sort_dict_keys_by_vals(influences)
         if experiment_type == "most-helpful":
             datapoint_indices = sorted_indices
 
@@ -224,7 +219,7 @@ def pseudo_gradient_step(
         model=model,
         inputs=inputs,
         params_filter=params_filter,
-        weight_decay=WEIGHT_DECAY,
+        weight_decay=constants.WEIGHT_DECAY,
         weight_decay_ignores=weight_decay_ignores)
 
     new_model = deepcopy(model)
@@ -256,7 +251,7 @@ def evaluate_heuristic(
     num_examples = 0
     for index, inputs in enumerate(batch_dataloader):
         batch_size = inputs["labels"].shape[0]
-        _, _, batch_mean_loss = predict(
+        _, _, batch_mean_loss = misc_utils.predict(
             trainer=trainer,
             model=model,
             inputs=inputs)
@@ -265,3 +260,44 @@ def evaluate_heuristic(
         loss += batch_mean_loss * batch_size
 
     return loss / num_examples
+
+
+def create_FAISS_index(
+    train_task_name: str,
+    trained_on_task_name: str,
+) -> faiss_utils.FAISSIndex:
+    if train_task_name not in ["mnli-2", "hans"]:
+        raise ValueError
+
+    if trained_on_task_name not in ["mnli-2", "hans"]:
+        raise ValueError
+
+    if trained_on_task_name == "mnli-2":
+        tokenizer, model = misc_utils.create_tokenizer_and_model(
+            constants.MNLI2_MODEL_PATH)
+
+    if trained_on_task_name == "hans":
+        tokenizer, model = misc_utils.create_tokenizer_and_model(
+            constants.HANS_MODEL_PATH)
+
+    train_dataset, _ = misc_utils.create_datasets(
+        task_name=train_task_name,
+        tokenizer=tokenizer)
+
+    faiss_index = faiss_utils.FAISSIndex(768, "Flat")
+
+    model.cuda()
+    device = model.device
+    train_batch_data_loader = misc_utils.get_dataloader(
+        dataset=train_dataset,
+        batch_size=128,
+        random=False)
+
+    for inputs in tqdm(train_batch_data_loader):
+        for k, v in inputs.items():
+            inputs[k] = v.to(device)
+        features = misc_utils.compute_BERT_CLS_feature(model, **inputs)
+        features = features.cpu().detach().numpy()
+        faiss_index.add(features)
+
+    return faiss_index
