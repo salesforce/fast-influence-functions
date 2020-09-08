@@ -1,12 +1,12 @@
-export GLUE_DIR=/export/home/Data/Glue
+export BASE_DIR_DIR=/export/home/Data
 
 python -m torch.distributed.launch \
     --nproc_per_node 4 run_glue.py \
     --model_name_or_path bert-base-cased \
-    --task_name mnli-2 \
+    --task_name hans \
     --do_train \
     --do_eval \
-    --data_dir $GLUE_DIR/MNLI/ \
+    --data_dir $BASE_DIR_DIR/HANS/ \
     --max_seq_length 128 \
     --per_device_train_batch_size 128 \
     --learning_rate 2e-5 \

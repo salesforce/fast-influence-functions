@@ -1,5 +1,7 @@
 import os
 
+# Note that the paths used in `scripts/run_*.sh` are still
+# hard-coded to `/export/home/`
 WEIGHT_DECAY = 0.005
 
 MNLI_MODEL_PATH = "/export/share/hguo/Experiments/20200706/"

@@ -61,7 +61,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
     jupyter lab build && \
     # Unset NODE_OPTIONS environment variable (OS X/Linux)
     unset NODE_OPTIONS && \
-    # for linking path from host machines
+    # for binding/linking path from host machines
+    mkdir -p /nlp && \
     mkdir -p /export/ && \
     chmod -R 777 /export
 
