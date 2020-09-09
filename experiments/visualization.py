@@ -350,8 +350,10 @@ def get_graph(
     for datapoint_index in trange(len(possible_datapoints)):
         v = g.add_vertex()
         v_sizes[v] = DEFAULT_TRAIN_VERTEX_SIZE
-        v_colors[v] = train_vertex_color_map_fn(datapoint_index)
-        v_radius[v] = train_vertex_radius_map_fn(datapoint_index)
+        v_colors[v] = train_vertex_color_map_fn(
+            possible_datapoints[datapoint_index])
+        v_radius[v] = train_vertex_radius_map_fn(
+            possible_datapoints[datapoint_index])
         v_data_indices[v] = f"train-{datapoint_index}"
         train_vertices.append(v)
 
