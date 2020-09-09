@@ -362,7 +362,7 @@ def get_graph(
             possible_datapoints[datapoint_index])
         v_radius[v] = train_vertex_radius_map_fn(
             possible_datapoints[datapoint_index])
-        v_data_indices[v] = f"train-{datapoint_index}"
+        v_data_indices[v] = f"train-{possible_datapoints[datapoint_index]}"
         train_vertices.append(v)
 
     # Add eval vertices
@@ -374,7 +374,7 @@ def get_graph(
             v_sizes[v] = 10
             v_colors[v] = eval_vertex_color_base + i
             v_radius[v] = eval_vertex_radius
-            v_data_indices[v] = f"A_eval-{datapoint_index}"
+            v_data_indices[v] = f"eval-{i}-{datapoint_index}"
 
             base_degree = (360 / NUM_INFLUENCE_COLLECTIONS) * i
             fine_degree = (360 / NUM_INFLUENCE_COLLECTIONS / len(influences_collections)) * datapoint_index
