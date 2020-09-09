@@ -6,7 +6,7 @@ from scipy.optimize import minimize
 # from graph_tool.draw import graph_draw
 # from joblib import Parallel, delayed
 
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Union, Callable
 from influence_utils import faiss_utils
 from influence_utils import parallel
 from influence_utils import nn_influence_utils
@@ -32,7 +32,14 @@ except ModuleNotFoundError:
     gt = None
     gt_Graph_t = "gt.Graph"
 
-KNN_K = 1000
+DEFAULT_KNN_K = 1000
+DEFAULT_TRAIN_VERTEX_COLOR = 0
+DEFAULT_TRAIN_VERTEX_RADIUS = 2
+DEFAULT_EVAL_VERTEX_COLORS_BASE = 2
+DEFAULT_EVAL_VERTEX_RADIUS = 3
+DEFAULT_HELPFUL_EDGE_COLOR = 0
+DEFAULT_HARMFUL_EDGE_COLOR = 1
+DEFAULT_TRAIN_VERTEX_SIZE = 3
 
 
 def main(
@@ -172,7 +179,7 @@ def main(
             features = misc_utils.compute_BERT_CLS_feature(model, **inputs)
             features = features.cpu().detach().numpy()
             KNN_distances, KNN_indices = faiss_index.search(
-                k=KNN_K, queries=features)
+                k=DEFAULT_KNN_K, queries=features)
         else:
             KNN_indices = None
 
@@ -290,9 +297,26 @@ def get_datapoints_map(
 
 
 def get_graph(
-        influences_collections_list: List[List[Dict[int, float]]]
+        influences_collections_list: List[List[Dict[int, float]]],
+        train_vertex_color_map_fn: Optional[Callable[[int], int]] = None,
+        train_vertex_radius_map_fn: Optional[Callable[[int], int]] = None,
 ) -> gt_Graph_t:
 
+    if train_vertex_color_map_fn is None:
+        def train_vertex_color_map_fn(index: int) -> int:
+            return DEFAULT_TRAIN_VERTEX_COLOR
+
+    if train_vertex_radius_map_fn is None:
+        def train_vertex_radius_map_fn(index: int) -> int:
+            return DEFAULT_TRAIN_VERTEX_RADIUS
+
+    if train_vertex_color_map_fn is None:
+        raise ValueError
+
+    if train_vertex_radius_map_fn is None:
+        raise ValueError
+
+    NUM_INFLUENCE_COLLECTIONS = len(influences_collections_list)
     influences_collections_list_flatten = []
     for influences_collections in influences_collections_list:
         # Assume they all have the same lengths
@@ -313,6 +337,7 @@ def get_graph(
     # Vertex properties
     v_sizes = g.new_vertex_property("int")
     v_colors = g.new_vertex_property("int")
+    v_radius = g.new_vertex_property("int")
     v_data_indices = g.new_vertex_property("string")
     v_positions = g.new_vertex_property("vector<double>")
     v_positive_positions = g.new_vertex_property("vector<double>")
@@ -321,20 +346,12 @@ def get_graph(
     train_vertices = []
     eval_vertices_collections = []
 
-    NUM_INFLUENCE_COLLECTIONS = len(influences_collections_list)
-    VERTEX_COLORS = range(2, 2 + NUM_INFLUENCE_COLLECTIONS)
-    HELPFUL_EDGE_COLOR = 0
-    HARMFUL_EDGE_COLOR = 1
-    TRAIN_VERTEX_SIZE = 3
-    TRAIN_VERTEX_COLOR = 0
-    EVAL_VERTICES_RADIUS = 3
-    TRAIN_VERTICES_RADIUS = 2
-
     # Add train vertices
     for datapoint_index in trange(len(possible_datapoints)):
         v = g.add_vertex()
-        v_sizes[v] = TRAIN_VERTEX_SIZE
-        v_colors[v] = TRAIN_VERTEX_COLOR
+        v_sizes[v] = DEFAULT_TRAIN_VERTEX_SIZE
+        v_colors[v] = train_vertex_color_map_fn(datapoint_index)
+        v_radius[v] = train_vertex_radius_map_fn(datapoint_index)
         v_data_indices[v] = f"train-{datapoint_index}"
         train_vertices.append(v)
 
@@ -345,13 +362,14 @@ def get_graph(
         for datapoint_index in trange(len(influences_collections)):
             v = g.add_vertex()
             v_sizes[v] = 10
-            v_colors[v] = VERTEX_COLORS[i]
+            v_colors[v] = DEFAULT_EVAL_VERTEX_COLORS_BASE + i
+            v_radius[v] = DEFAULT_EVAL_VERTEX_RADIUS
             v_data_indices[v] = f"A_eval-{datapoint_index}"
 
             base_degree = (360 / NUM_INFLUENCE_COLLECTIONS) * i
             fine_degree = (360 / NUM_INFLUENCE_COLLECTIONS / len(influences_collections)) * datapoint_index
             x_y_coordinate = get_circle_coordinates(
-                r=EVAL_VERTICES_RADIUS,
+                r=DEFAULT_EVAL_VERTEX_RADIUS,
                 degree=base_degree + fine_degree)
             position = np.random.normal(x_y_coordinate, 0.1)
             v_positions[v] = position
@@ -371,7 +389,7 @@ def get_graph(
                     train_vertex = train_vertices[datapoints_map[train_index]]
                     eval_vertex = eval_vertices[eval_index]
                     e = g.add_edge(train_vertex, eval_vertex)
-                    e_colors[e] = HELPFUL_EDGE_COLOR
+                    e_colors[e] = DEFAULT_HELPFUL_EDGE_COLOR
                     e_weights[e] = np.abs(train_influence)
                     e_signed_influences[e] = train_influence
                     e_unsigned_influences[e] = np.abs(train_influence)
@@ -379,7 +397,7 @@ def get_graph(
                     train_vertex = train_vertices[datapoints_map[train_index]]
                     eval_vertex = eval_vertices[eval_index]
                     e = g.add_edge(train_vertex, eval_vertex)
-                    e_colors[e] = HARMFUL_EDGE_COLOR
+                    e_colors[e] = DEFAULT_HARMFUL_EDGE_COLOR
                     e_weights[e] = np.abs(train_influence)
                     e_signed_influences[e] = train_influence
                     e_unsigned_influences[e] = np.abs(train_influence)
@@ -408,10 +426,10 @@ def get_graph(
                 _negative_influences.append(e_unsigned_influences[e])
 
         # `minimize` might fail using `np.sqrt(2)` for some reasons :\
-        bound = 1.4 * TRAIN_VERTICES_RADIUS
+        bound = 1.4 * v_radius[train_vertex]
         constraints = ({
             "type": "ineq",
-            "fun": get_within_circle_constraint(TRAIN_VERTICES_RADIUS)
+            "fun": get_within_circle_constraint(v_radius[train_vertex])
         })
 
         if len(_positive_influences) == 0:
@@ -468,6 +486,7 @@ def get_graph(
     # Assign Vertex properties
     g.vertex_properties["sizes"] = v_sizes
     g.vertex_properties["colors"] = v_colors
+    g.vertex_properties["radius"] = v_radius
     g.vertex_properties["data_indices"] = v_data_indices
     g.vertex_properties["positions"] = v_positions
     g.vertex_properties["positive_positions"] = v_positive_positions
