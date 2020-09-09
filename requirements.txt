@@ -10,3 +10,4 @@ pandas
 yagmail[all]
 scp
 streamlit
+pycairo
