@@ -300,6 +300,8 @@ def get_graph(
         influences_collections_list: List[List[Dict[int, float]]],
         train_vertex_color_map_fn: Optional[Callable[[int], int]] = None,
         train_vertex_radius_map_fn: Optional[Callable[[int], int]] = None,
+        eval_vertex_radius: Optional[int] = None,
+        eval_vertex_color_base: Optional[int] = None,
 ) -> gt_Graph_t:
 
     if train_vertex_color_map_fn is None:
@@ -309,6 +311,12 @@ def get_graph(
     if train_vertex_radius_map_fn is None:
         def train_vertex_radius_map_fn(index: int) -> int:
             return DEFAULT_TRAIN_VERTEX_RADIUS
+
+    if eval_vertex_radius is None:
+        eval_vertex_radius = DEFAULT_EVAL_VERTEX_RADIUS
+
+    if eval_vertex_color_base is None:
+        eval_vertex_color_base = DEFAULT_EVAL_VERTEX_COLORS_BASE
 
     if train_vertex_color_map_fn is None:
         raise ValueError
@@ -364,14 +372,14 @@ def get_graph(
         for datapoint_index in trange(len(influences_collections)):
             v = g.add_vertex()
             v_sizes[v] = 10
-            v_colors[v] = DEFAULT_EVAL_VERTEX_COLORS_BASE + i
-            v_radius[v] = DEFAULT_EVAL_VERTEX_RADIUS
+            v_colors[v] = eval_vertex_color_base + i
+            v_radius[v] = eval_vertex_radius
             v_data_indices[v] = f"A_eval-{datapoint_index}"
 
             base_degree = (360 / NUM_INFLUENCE_COLLECTIONS) * i
             fine_degree = (360 / NUM_INFLUENCE_COLLECTIONS / len(influences_collections)) * datapoint_index
             x_y_coordinate = get_circle_coordinates(
-                r=DEFAULT_EVAL_VERTEX_RADIUS,
+                r=eval_vertex_radius,
                 degree=base_degree + fine_degree)
             position = np.random.normal(x_y_coordinate, 0.1)
             v_positions[v] = position
