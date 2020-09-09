@@ -83,7 +83,7 @@ def main(
     elif trained_on_task_name == "hans" and train_task_name == "hans":
         faiss_index = faiss_utils.FAISSIndex(768, "Flat")
         faiss_index.load(constants.HANS_FAISS_INDEX_PATH)
-    elif trained_on_task_name == "mnli-2" and eval_task_name == "hans":
+    elif trained_on_task_name == "mnli-2" and train_task_name == "hans":
         faiss_index = faiss_utils.FAISSIndex(768, "Flat")
         faiss_index.load(constants.MNLI2_HANS_FAISS_INDEX_PATH)
     elif trained_on_task_name == "hans" and train_task_name == "mnli-2":
@@ -160,7 +160,7 @@ def main(
         s_test_scale = 1e6
         s_test_num_samples = 1000
 
-    if trained_on_task_name == "hans" and train_task_name == "mnli-2":
+    if trained_on_task_name == "hans" and eval_task_name == "mnli-2":
         s_test_damp = 5e-3
         s_test_scale = 1e6
         s_test_num_samples = 2000
