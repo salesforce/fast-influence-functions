@@ -25,7 +25,7 @@ from transformers import Trainer, TrainingArguments
 
 try:
     import graph_tool as gt
-    import gt.Graph as gt_Graph_t
+    gt_Graph_t = gt.Graph
 except ModuleNotFoundError:
     # We do not need `graph_tool` unless
     # visualization is to be created
