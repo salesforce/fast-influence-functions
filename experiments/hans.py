@@ -287,7 +287,7 @@ def evaluate_heuristic(
 
         num_examples += batch_size
         loss += batch_mean_loss * batch_size
-        num_corrects += (batch_preds == batch_label_ids).sum()
+        num_corrects += (batch_preds.argmax(axis=-1) == batch_label_ids).sum()
 
     return loss / num_examples, num_corrects / num_examples
 

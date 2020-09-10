@@ -46,7 +46,7 @@ def main(
     train_task_name: str,
     eval_task_name: str,
     num_eval_to_collect: int,
-    use_parallel: Optional[bool] = True,
+    use_parallel: bool = True,
     hans_heuristic: Optional[str] = None,
     trained_on_task_name: Optional[str] = None,
 ) -> List[Dict[int, float]]:
