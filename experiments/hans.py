@@ -175,7 +175,7 @@ def one_experiment(
                 batch_size=1,
                 random=False)
 
-            influences, _, _ = nn_influence_utils.compute_influences(
+            influences, _, s_test = nn_influence_utils.compute_influences(
                 n_gpu=1,
                 device=torch.device("cuda"),
                 batch_train_data_loader=batch_train_data_loader,
