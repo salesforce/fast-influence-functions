@@ -1,6 +1,7 @@
 from typing import Optional, Dict
 
 from experiments import mnli
+from experiments import hans
 from experiments import s_test_speedup
 from experiments import remote_utils
 from experiments import visualization
@@ -65,6 +66,17 @@ def visualization_experiments(
         trained_on_task_name="hans")
 
 
+def hans_augmentation_experiments(
+        num_replicas: Optional[int] = None
+) -> None:
+    # We will use the all the `train_heuristic` here, as we did in
+    # `eval_heuristics`. So looping over the `DEFAULT_EVAL_HEURISTICS`
+    for train_heuristic in hans.DEFAULT_EVAL_HEURISTICS:
+        hans.main(
+            train_heuristic=train_heuristic,
+            num_replicas=num_replicas)
+
+
 # ------------------------------------------------------------------
 # TEST FUNCTIONS
 # ------------------------------------------------------------------
@@ -82,4 +94,4 @@ def check_KNN_recall_local_remote_match(
 if __name__ == "__main__":
     # Make sure the environment is properly setup
     remote_utils.setup_and_verify_environment()
-    visualization_experiments()
+    hans_augmentation_experiments()
