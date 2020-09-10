@@ -20,6 +20,7 @@ from experiments.data_utils import (
     glue_compute_metrics,
     CustomGlueDataset)
 
+DEFAULT_KNN_K = 1000
 DEFAULT_NUM_REPLICAS = 3
 EXPERIMENT_TYPES = ["most-helpful", "most-harmful", "random"]
 DEFAULT_EVAL_HEURISTICS = ["lexical_overlap", "subsequence", "constituent"]
@@ -29,6 +30,7 @@ def main(
         train_heuristic: str,
         eval_heuristics: Optional[List[str]] = None,
         num_replicas: Optional[int] = None,
+        use_parallel: bool = True,
 ) -> Dict[str, List[Dict[str, Any]]]:
 
     if eval_heuristics is None:
@@ -53,6 +55,11 @@ def main(
     hans_helper = HansHelper(
         hans_train_dataset=hans_train_dataset,
         hans_eval_dataset=hans_eval_dataset)
+
+    # We will be running model trained on MNLI-2
+    # but calculate influences on HANS dataset
+    faiss_index = faiss_utils.FAISSIndex(768, "Flat")
+    faiss_index.load(constants.MNLI2_HANS_FAISS_INDEX_PATH)
 
     output_mode = glue_output_modes["mnli-2"]
 
@@ -98,12 +105,14 @@ def main(
         for experiment_type in EXPERIMENT_TYPES:
             for replica_index in range(num_replicas):
                 outputs_one_experiment = one_experiment(
+                    use_parallel=use_parallel,
                     train_heuristic=train_heuristic,
                     eval_heuristics=eval_heuristics,
                     experiment_type=experiment_type,
                     hans_helper=hans_helper,
                     hans_train_dataset=hans_train_dataset,
                     task_model=task_model,
+                    faiss_index=faiss_index,
                     params_filter=params_filter,
                     weight_decay_ignores=weight_decay_ignores,
                     trainer=trainer)
@@ -120,37 +129,84 @@ def main(
 
 
 def one_experiment(
+    use_parallel: bool,
     train_heuristic: str,
     eval_heuristics: List[str],
     experiment_type: str,
     hans_helper: HansHelper,
     hans_train_dataset: CustomGlueDataset,
     task_model: torch.nn.Module,
+    faiss_index: faiss_utils.FAISSIndex,
     params_filter: List[str],
     weight_decay_ignores: List[str],
-    trainer: transformers.Trainer
+    trainer: transformers.Trainer,
 ) -> Dict[str, Any]:
+    if task_model.device.type != "cuda":
+        raise ValueError("The model is supposed to be on CUDA")
+
     if experiment_type in ["most-harmful", "most-helpful"]:
 
         hans_eval_heuristic_inputs = hans_helper.sample_batch_of_heuristic(
             mode="eval", heuristic=train_heuristic, size=128)
 
-        influences, s_test = parallel.compute_influences_parallel(
-            # Avoid clash with main process
-            device_ids=[1, 2, 3],
-            train_dataset=hans_train_dataset,
-            batch_size=1,
-            model=task_model,
-            test_inputs=hans_eval_heuristic_inputs,
-            params_filter=params_filter,
-            weight_decay=constants.WEIGHT_DECAY,
-            weight_decay_ignores=weight_decay_ignores,
-            s_test_damp=5e-3,
-            s_test_scale=1e6,
-            s_test_num_samples=1000,
-            train_indices_to_include=None,
-            return_s_test=True,
-            debug=False)
+        misc_utils.move_inputs_to_device(
+            inputs=hans_eval_heuristic_inputs,
+            device=task_model.device)
+
+        if faiss_index is not None:
+            features = misc_utils.compute_BERT_CLS_feature(
+                task_model, **hans_eval_heuristic_inputs)
+            features = features.cpu().detach().numpy()
+            # We use the mean embedding as the final query here
+            features = features.mean(axis=0, keepdims=True)
+            KNN_distances, KNN_indices = faiss_index.search(
+                k=DEFAULT_KNN_K, queries=features)
+        else:
+            KNN_indices = None
+
+        if not use_parallel:
+            batch_train_data_loader = misc_utils.get_dataloader(
+                hans_train_dataset,
+                batch_size=1,
+                random=True)
+
+            instance_train_data_loader = misc_utils.get_dataloader(
+                hans_train_dataset,
+                batch_size=1,
+                random=False)
+
+            influences, _, _ = nn_influence_utils.compute_influences(
+                n_gpu=1,
+                device=torch.device("cuda"),
+                batch_train_data_loader=batch_train_data_loader,
+                instance_train_data_loader=instance_train_data_loader,
+                model=task_model,
+                test_inputs=hans_eval_heuristic_inputs,
+                params_filter=params_filter,
+                weight_decay=constants.WEIGHT_DECAY,
+                weight_decay_ignores=weight_decay_ignores,
+                s_test_damp=5e-3,
+                s_test_scale=1e6,
+                s_test_num_samples=1000,
+                train_indices_to_include=KNN_indices,
+                precomputed_s_test=None)
+        else:
+            influences, s_test = parallel.compute_influences_parallel(
+                # Avoid clash with main process
+                device_ids=[1, 2, 3],
+                train_dataset=hans_train_dataset,
+                batch_size=1,
+                model=task_model,
+                test_inputs=hans_eval_heuristic_inputs,
+                params_filter=params_filter,
+                weight_decay=constants.WEIGHT_DECAY,
+                weight_decay_ignores=weight_decay_ignores,
+                s_test_damp=5e-3,
+                s_test_scale=1e6,
+                s_test_num_samples=1000,
+                train_indices_to_include=KNN_indices,
+                return_s_test=True,
+                debug=False)
 
         sorted_indices = misc_utils.sort_dict_keys_by_vals(influences)
         if experiment_type == "most-helpful":
