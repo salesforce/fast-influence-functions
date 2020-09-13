@@ -130,7 +130,7 @@ def speed_test(version: str, num_examples_to_test: int) -> Dict:
         device = torch.device("cuda")
 
     tokenizer, model = misc_utils.create_tokenizer_and_model(
-        "/export/home/Experiments/20200706/")
+        constants.MNLI_MODEL_PATH)
     train_dataset, eval_dataset = misc_utils.create_datasets(
         tokenizer=tokenizer)
     eval_instance_data_loader = misc_utils.get_dataloader(
@@ -285,6 +285,4 @@ def speed_test(version: str, num_examples_to_test: int) -> Dict:
 
 if __name__ == "__main__":
     outputs_collections = speed_test(sys.argv[1], int(sys.argv[2]))
-    torch.save(outputs_collections,
-               f"/export/home/Experiments/20200728/"
-               f"{sys.argv[1]}-{int(sys.argv[2])}")
+    torch.save(outputs_collections, f"{sys.argv[1]}-{int(sys.argv[2])}")

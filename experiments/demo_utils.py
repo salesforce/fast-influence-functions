@@ -231,11 +231,11 @@ def load_dataset(name: str) -> pd.DataFrame:
         raise ValueError
 
     if name in ["mnli", "mnli-2"]:
-        file_name = "/export/share/hguo/Data/Glue/MNLI/dev_matched.tsv"
+        file_name = constants.MNLI_EVAL_FILE_NAME
         columns = ["index", "sentence1", "sentence2", "gold_label"]
 
     if name == "hans":
-        file_name = "/export/share/hguo/Data/HANS/heuristics_evaluation_set.txt"
+        file_name = constants.HANS_EVAL_FILE_NAME
         columns = ["heuristic", "sentence1", "sentence2", "gold_label"]
 
     data = pd.read_csv(file_name, sep="\t")
