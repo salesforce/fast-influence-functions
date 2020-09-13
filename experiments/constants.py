@@ -35,3 +35,17 @@ REMOTE_DEFAULT_SERVER_PASSWORD = None
 REMOTE_DEFAULT_SERVER_ADDRESS = "ec2-54-172-210-41.compute-1.amazonaws.com"
 REMOTE_DEFAULT_SSH_KEY_FILENAME = "./cluster/salesforce-intern-project.pem"
 REMOTE_DEFAULT_REMOTE_BASE_DIR = os.getenv("REMOTE_BASE_DIR")
+
+
+# Some useful default hparams for influence functions
+DEFAULT_INFLUENCE_HPARAMS = {
+    # `train_on_task_name`
+    "mnli": {
+        # `eval_task_name`
+        "mnli": {
+            "damp": 5e-3,
+            "scale": 1e4,
+            "num_samples": 1000
+        }
+    }
+}

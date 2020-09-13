@@ -10,6 +10,7 @@ from influence_utils import nn_influence_utils
 from influence_utils.nn_influence_utils import compute_s_test
 from experiments import constants
 from experiments import misc_utils
+from experiments import remote_utils
 
 
 def one_experiment(
@@ -58,9 +59,13 @@ def one_experiment(
 
 
 def main(
+    mode: str,
     num_examples_to_test: int = 5,
-    num_repetitions: int = 1,
+    num_repetitions: int = 4,
 ) -> List[Dict[str, Any]]:
+
+    if mode not in ["only-correct", "only-incorrect"]:
+        raise ValueError(f"Unrecognized mode {mode}")
 
     task_tokenizer, task_model = misc_utils.create_tokenizer_and_model(
         constants.MNLI_MODEL_PATH)
@@ -73,10 +78,20 @@ def main(
         random=False)
 
     task_model.cuda()
+    num_examples_tested = 0
     output_collections = []
     for test_index, test_inputs in enumerate(eval_instance_data_loader):
-        if test_index >= num_examples_to_test:
+        if num_examples_tested >= num_examples_to_test:
             break
+
+        # Skip when we only want cases of correction prediction but the
+        # prediction is incorrect, or vice versa
+        prediction_is_correct = misc_utils.is_prediction_correct()
+        if mode == "only-correct" and not prediction_is_correct:
+            continue
+
+        if mode == "only-incorrect" and prediction_is_correct:
+            continue
 
         for k, v in test_inputs.items():
             if isinstance(v, torch.Tensor):
@@ -99,12 +114,13 @@ def main(
                             random=True,
                             n_gpu=1,
                             device=torch.device("cuda"),
-                            damp=5e-3,
-                            scale=1e4,
+                            damp=constants.DEFAULT_INFLUENCE_HPARAMS["mnli"]["mnli"]["damp"],
+                            scale=constants.DEFAULT_INFLUENCE_HPARAMS["mnli"]["mnli"]["scale"],
                             num_samples=num_samples)
                         time_elapsed = timer.elapsed
                         print(f"{time_elapsed:.2f} seconds")
 
+                    num_examples_tested += 1
                     output_collections.append({
                         "test_index": test_index,
                         "num_samples": num_samples,
@@ -112,7 +128,14 @@ def main(
                         "repetition": repetition,
                         "s_test": s_test,
                         "time_elapsed": time_elapsed,
+                        "correct": prediction_is_correct,
                     })
+
+                    remote_utils.save_and_mirror_scp_object(
+                        object_to_save=outputs_collections[test_index],
+                        file_name=f"stest.{mode}.{num_examples_to_test}."
+                                  f"{test_index}.{num_samples}."
+                                  f"{batch_size}.{repetition}.pth")
 
     return output_collections
 
