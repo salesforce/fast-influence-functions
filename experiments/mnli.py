@@ -132,17 +132,17 @@ def run_full_influence_functions(
                 s_test_iterations=1,
                 precomputed_s_test=None)
 
-            output = {
+            outputs = {
                 "influences": influences,
                 "s_test": s_test,
                 "time": timer.elapsed,
                 "correct": prediction_is_correct,
             }
             num_examples_tested += 1
-            outputs_collections[test_index] = output
+            outputs_collections[test_index] = outputs
 
             remote_utils.save_and_mirror_scp_to_remote(
-                object_to_save=output,
+                object_to_save=outputs,
                 file_name=f"KNN-recall.{mode}.{num_examples_to_test}.{test_index}.pth")
             print(f"Status: #{test_index} | {num_examples_tested} / {num_examples_to_test}")
 

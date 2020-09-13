@@ -160,7 +160,7 @@ def main(
                         time_elapsed = timer.elapsed
                         print(f"{time_elapsed:.2f} seconds")
 
-                    output = {
+                    outputs = {
                         "test_index": test_index,
                         "num_samples": num_samples,
                         "batch_size": batch_size,
@@ -170,9 +170,9 @@ def main(
                         "correct": prediction_is_correct,
                     }
                     num_examples_tested += 1
-                    output_collections.append(output)
+                    output_collections.append(outputs)
                     remote_utils.save_and_mirror_scp_object(
-                        object_to_save=output,
+                        object_to_save=outputs,
                         file_name=f"stest.{mode}.{num_examples_to_test}."
                                   f"{test_index}.{num_samples}."
                                   f"{batch_size}.{repetition}.pth")
