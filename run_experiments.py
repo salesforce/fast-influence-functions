@@ -6,6 +6,8 @@ from experiments import s_test_speedup
 from experiments import remote_utils
 from experiments import visualization
 
+
+USE_PARALLEL = True
 NUM_KNN_RECALL_EXPERIMENTS = 50
 NUM_STEST_EXPERIMENTS = 10
 NUM_VISUALIZATION_EXPERIMENTS = 100
@@ -58,11 +60,21 @@ def visualization_experiments(
     if num_experiments is None:
         num_experiments = NUM_VISUALIZATION_EXPERIMENTS
 
+    for heuristic in hans.DEFAULT_EVAL_HEURISTICS:
+        visualization.main(
+            train_task_name="hans",
+            eval_task_name="hans",
+            num_eval_to_collect=num_experiments,
+            use_parallel=USE_PARALLEL,
+            hans_heuristic=heuristic,
+            trained_on_task_name="hans")
+
     visualization.main(
         train_task_name="hans",
-        eval_task_name="hans",
+        eval_task_name="mnli-2",
         num_eval_to_collect=num_experiments,
-        hans_heuristic="lexical_overlap",
+        use_parallel=USE_PARALLEL,
+        hans_heuristic=None,
         trained_on_task_name="hans")
 
 
@@ -74,7 +86,8 @@ def hans_augmentation_experiments(
     for train_heuristic in hans.DEFAULT_EVAL_HEURISTICS:
         hans.main(
             train_heuristic=train_heuristic,
-            num_replicas=num_replicas)
+            num_replicas=num_replicas,
+            use_parallel=USE_PARALLEL)
 
 
 # ------------------------------------------------------------------
