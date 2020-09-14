@@ -1,5 +1,7 @@
+import os
 import time
 import torch
+import subprocess
 import numpy as np
 import matplotlib.pyplot as plt
 import transformers
@@ -12,6 +14,7 @@ from transformers import default_data_collator
 from typing import List, Dict, Tuple, Optional, Union, Any
 
 from experiments import constants
+from experiments import mnli_utils
 from experiments import misc_utils
 from experiments import remote_utils
 from influence_utils import faiss_utils
@@ -21,6 +24,61 @@ from experiments.data_utils import (
     glue_compute_metrics)
 
 
+MNLI_TRAINING_SCRIPT_NAME = "scripts/run_MNLI.20200913.sh"
+
+
+def run_retraining_main(
+        mode: str,
+        num_examples_to_test: int):
+
+    # Load file from local or sync from remote
+    full_influences = misc_utils.load_file_from_local_or_remote()
+    KNN_1000_influences = misc_utils.load_file_from_local_or_remote()
+    KNN_10000_influences = misc_utils.load_file_from_local_or_remote()
+
+    full_helpful_influences = misc_utils.sort_dict_keys_by_vals(
+        full_influences["influences"])
+    KNN_1000_helpful_indices = misc_utils.sort_dict_keys_by_vals(
+        KNN_1000_influences["influences"])
+    KNN_10000_helpful_indices = misc_utils.sort_dict_keys_by_vals(
+        KNN_10000_influences["influences"])
+
+    full_harmful_influences = full_helpful_influences[::-1]
+    KNN_1000_harmful_indices = KNN_1000_helpful_indices[::-1]
+    KNN_10000_harmful_indices = KNN_10000_helpful_indices[::-1]
+
+    # Get indices corresponding to each label
+    label_to_indices = mnli_utils.get_label_to_indices_map()
+    random_neutral_indices = label_to_indices["neutral"]
+    random_entailment_indices = label_to_indices["entailment"]
+    random_contradiction_indices = label_to_indices["contradiction"]
+
+    for num_data_points_to_remove in [1, 100, 10000]:
+        for indices in [
+            full_helpful_influences,
+            KNN_1000_helpful_indices,
+            KNN_10000_helpful_indices,
+            full_harmful_influences,
+            KNN_1000_harmful_indices,
+            KNN_10000_harmful_indices,
+            random_neutral_indices,
+            random_entailment_indices,
+            random_contradiction_indices,
+        ]:
+            data_dir = mnli_utils.create_one_set_of_data_for_retraining(
+                indices[:num_data_points_to_remove])
+            output_dir = os.path.join(data_dir, "output_dir")
+            output_dir = os.path.abspath(output_dir)
+            subprocess.check_call([
+                "bash",
+                MNLI_TRAINING_SCRIPT_NAME,
+                data_dir, output_dir
+            ])
+            remote_utils.scp_file_to_remote(
+                local_file_name=output_dir,
+                remote_file_name=output_dir,
+                # This is a folder
+                recursive=True)
 
 
 def run_full_influence_functions(
@@ -355,7 +413,7 @@ def compute_new_imitator_losses(
             model=imitator_model,
             inputs=imitator_train_inputs,
             params_filter=params_filter,
-            weight_decay=WEIGHT_DECAY,
+            weight_decay=constants.WEIGHT_DECAY,
             weight_decay_ignores=weight_decay_ignores)
 
         _losses = []
