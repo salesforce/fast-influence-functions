@@ -68,8 +68,7 @@ def run_retraining_main(
                 for num_data_points_to_remove in NUM_DATAPOINTS_TO_REMOVE_CHOICES:
                     run_one_retraining(
                         indices=indices[:num_data_points_to_remove],
-                        dir_name=os.path.join(
-                            constants.REMOTE_DEFAULT_REMOTE_BASE_DIR,
+                        dir_name=(
                             f"./retraining-remove-"
                             f"{example_index}-"
                             f"{correct_mode}-"
@@ -93,7 +92,9 @@ def run_one_retraining(
     ])
     remote_utils.scp_file_to_remote(
         local_file_name=dir_name,
-        remote_file_name=dir_name,
+        remote_file_name=os.path.join(
+            constants.REMOTE_DEFAULT_REMOTE_BASE_DIR,
+            dir_name),
         # This is a folder
         recursive=True)
 
