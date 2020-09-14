@@ -9,7 +9,7 @@ import yagmail
 from scp import SCPClient
 from paramiko import SSHClient
 from transformers import trainer_utils
-from typing import List, Optional, Any, Tuple
+from typing import List, Optional, Any, Tuple, Dict
 
 from experiments import misc_utils
 from experiments import constants
@@ -118,18 +118,22 @@ class ScpClient(object):
     def scp_file_to_remote(
             self,
             local_file_name: str,
-            remote_file_name: str) -> None:
+            remote_file_name: str,
+            recursive: bool = False) -> None:
         with SCPClient(self._ssh.get_transport()) as scp:
             scp.put(files=local_file_name,
-                    remote_path=remote_file_name)
+                    remote_path=remote_file_name,
+                    recursive=recursive)
 
     def scp_file_from_remote(
             self,
             local_file_name: str,
-            remote_file_name: str) -> None:
+            remote_file_name: str,
+            recursive: bool = False) -> None:
         with SCPClient(self._ssh.get_transport()) as scp:
             scp.get(remote_path=remote_file_name,
-                    local_path=local_file_name)
+                    local_path=local_file_name,
+                    recursive=recursive)
 
     def save_and_mirror_scp_to_remote(
             self,
