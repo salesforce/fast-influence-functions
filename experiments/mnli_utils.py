@@ -69,6 +69,40 @@ def get_data_from_features_or_inputs(
     premise, hypothesis = X.split("[CLS]")[1].split("[SEP]")[:2]
     return premise.strip(), hypothesis.strip(), Y
 
+
+def create_one_set_of_data_for_retraining(
+        dir_name: str,
+        indices_to_remove: List[int],
+) -> None:
+    """Create the training data and evaluation data
+
+    1. Load the training data, remove lines based in inputs, and write.
+    2. Copy the evaluation data into the same directory.
+
+    """
+    with open(constants.MNLI_TRAIN_FILE_NAME) as f:
+        lines = f.readlines()
+
+    if not os.path.isdir(dir_name):
+        os.makedirs(dir_name)
+    else:
+        raise ValueError
+
+    with open(os.path.join(dir_name, "train.tsv"), "w") as f:
+        lines_to_write = [
+            # "-1" because of the header line
+            l for i, l in enumerate(lines)
+            if i - 1 not in indices_to_remove]
+
+        f.write("".join(lines_to_write))
+        print(f"Wrote {len(lines_to_write)} to {dir_name}")
+
+    shutil.copyfile(constants.MNLI_EVAL_MATCHED_FILE_NAME,
+                    os.path.join(dir_name, "dev_matched.tsv"))
+    shutil.copyfile(constants.MNLI_EVAL_MISMATCHED_FILE_NAME,
+                    os.path.join(dir_name, "dev_mismatched.tsv"))
+
+
 def get_label_to_indices_map() -> Dict[str, List[int]]:
     with open(constants.MNLI_TRAIN_FILE_NAME) as f:
         lines = f.readlines()
