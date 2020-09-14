@@ -231,7 +231,7 @@ def load_dataset(name: str) -> pd.DataFrame:
         raise ValueError
 
     if name in ["mnli", "mnli-2"]:
-        file_name = constants.MNLI_EVAL_FILE_NAME
+        file_name = constants.MNLI_EVAL_MATCHED_FILE_NAME
         columns = ["index", "sentence1", "sentence2", "gold_label"]
 
     if name == "hans":

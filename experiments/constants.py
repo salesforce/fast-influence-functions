@@ -23,7 +23,9 @@ MNLI_TRAIN_INPUT_COLLECTIONS_PATH = "/export/share/hguo/Experiments/20200706/tra
 
 HANS_DATA_DIR = "/export/share/hguo/Data/HANS/"
 GLUE_DATA_DIR = "/export/share/hguo/Data/Glue/MNLI/"
-MNLI_EVAL_FILE_NAME = "/export/share/hguo/Data/Glue/MNLI/dev_matched.tsv"
+MNLI_TRAIN_FILE_NAME = "/export/share/hguo/Data/Glue/MNLI/train.tsv"
+MNLI_EVAL_MATCHED_FILE_NAME = "/export/share/hguo/Data/Glue/MNLI/dev_matched.tsv"
+MNLI_EVAL_MISMATCHED_FILE_NAME = "/export/share/hguo/Data/Glue/MNLI/dev_mismatched.tsv"
 HANS_TRAIN_FILE_NAME = "/export/share/hguo/Data/HANS/heuristics_train_set.txt"
 HANS_EVAL_FILE_NAME = "/export/share/hguo/Data/HANS/heuristics_evaluation_set.txt"
 
