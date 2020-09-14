@@ -170,7 +170,7 @@ def main(
                         "correct": prediction_is_correct,
                     }
                     output_collections.append(outputs)
-                    remote_utils.save_and_mirror_scp_object(
+                    remote_utils.save_and_mirror_scp_to_remote(
                         object_to_save=outputs,
                         file_name=f"stest.{mode}.{num_examples_to_test}."
                                   f"{test_index}.{num_samples}."
