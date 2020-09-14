@@ -41,7 +41,7 @@ def run_retraining_main(
             if mode in ["full", "KNN-1000", "KNN-10000"]:
                 # Load file from local or sync from remote
                 if mode == "full":
-                    file_name = (
+                    file_name = os.path.join(
                         INFLUENCE_OUTPUT_BASE_DIR,
                         f"KNN-recall.only-{correct_mode}.50.{example_index}"
                         f".pth.sfr-pod-nazneen-rajani")
