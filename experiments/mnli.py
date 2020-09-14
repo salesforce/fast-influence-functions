@@ -45,7 +45,7 @@ def run_retraining_main(
                         INFLUENCE_OUTPUT_BASE_DIR,
                         f"KNN-recall.only-{correct_mode}.50.{example_index}"
                         f".pth.sfr-pod-nazneen-rajani")
-                influences_dict = misc_utils.load_file_from_local_or_remote(
+                influences_dict = remote_utils.load_file_from_local_or_remote(
                     local_file_name=file_name,
                     remote_file_name=file_name)
                 helpful_indices = misc_utils.sort_dict_keys_by_vals(
