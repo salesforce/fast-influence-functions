@@ -1,3 +1,4 @@
+import sys
 from typing import Optional, Dict
 
 from experiments import mnli
@@ -107,4 +108,13 @@ def check_KNN_recall_local_remote_match(
 if __name__ == "__main__":
     # Make sure the environment is properly setup
     remote_utils.setup_and_verify_environment()
-    hans_augmentation_experiments()
+
+    experiment_name = sys.argv[1]
+    if experiment_name == "s-test":
+        s_test_speed_quality_tradeoff_experiments()
+
+    if experiment_name == "retraining":
+        MNLI_retraining_experiments()
+
+    if experiment_name == "hans-augmentation":
+        hans_augmentation_experiments()
