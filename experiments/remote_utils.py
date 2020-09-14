@@ -176,6 +176,72 @@ def save_and_mirror_scp_to_remote(
     return client, remote_file_name
 
 
+def maybe_download_file_from_remote_server(
+        local_file_name: str,
+        remote_file_name: Optional[str] = None,
+        server_address: Optional[str] = None,
+        server_username: Optional[str] = None,
+        server_password: Optional[str] = None,
+        ssh_key_filename: Optional[str] = None
+) -> None:
+    """Check if `local_file_name` exists, or scp from `remote_file_name` if not."""
+    if os.path.exists(local_file_name):
+        print("Local file exists")
+        return
+
+    print("Local file does not exist, syncing from remote server")
+    if remote_file_name is None:
+        raise ValueError
+
+    client = ScpClient(
+        server_address=server_address,
+        server_username=server_username,
+        server_password=server_password,
+        ssh_key_filename=ssh_key_filename)
+
+    client.scp_file_from_remote(
+        local_file_name=local_file_name,
+        remote_file_name=remote_file_name)
+
+
+def load_file_from_local_or_remote(
+        local_file_name: str,
+        remote_file_name: Optional[str] = None,
+        server_address: Optional[str] = None,
+        server_username: Optional[str] = None,
+        server_password: Optional[str] = None,
+        ssh_key_filename: Optional[str] = None
+) -> Any:
+    """Load `local_file_name` if exists, or download + load
+       `remote_file_name` to `local_file_name` if not
+    """
+    maybe_download_file_from_remote_server(
+        local_file_name=local_file_name,
+        remote_file_name=remote_file_name)
+
+    return torch.load(local_file_name)
+
+
+def get_label_to_indices_map() -> Dict[str, List[int]]:
+    contradiction_indices = []
+    entailment_indices = []
+    neutral_indices = []
+    train_inputs_collections = torch.load(constants.MNLI_TRAIN_INPUT_COLLECTIONS_PATH)
+    for index, train_inputs in enumerate(train_inputs_collections):
+        if train_inputs["labels"].item() == 0:
+            contradiction_indices.append(index)
+        if train_inputs["labels"].item() == 1:
+            entailment_indices.append(index)
+        if train_inputs["labels"].item() == 2:
+            neutral_indices.append(index)
+
+    return {
+        "contradiction": contradiction_indices,
+        "entailment": entailment_indices,
+        "neutral": neutral_indices,
+    }
+
+
 def test_save_and_mirror_scp_to_remote():
     import torch  # Only importing torch here
     tensor = torch.rand(100, 100)
