@@ -10,6 +10,7 @@ from experiments import visualization
 
 USE_PARALLEL = True
 NUM_KNN_RECALL_EXPERIMENTS = 50
+NUM_RETRAINING_EXPERIMENTS = 3
 NUM_STEST_EXPERIMENTS = 10
 NUM_VISUALIZATION_EXPERIMENTS = 100
 
@@ -49,6 +50,19 @@ def s_test_speed_quality_tradeoff_experiments(
 
     s_test_speedup.main(
         mode="only-incorrect",
+        num_examples_to_test=num_experiments)
+
+
+def MNLI_retraining_experiments(
+        num_experiments: Optional[int] = None
+) -> None:
+    print("RUNNING `MNLI_retraining_experiments`")
+
+    if num_experiments is None:
+        num_experiments = NUM_RETRAINING_EXPERIMENTS
+
+    mnli.run_retraining_main(
+        mode="full",
         num_examples_to_test=num_experiments)
 
 
