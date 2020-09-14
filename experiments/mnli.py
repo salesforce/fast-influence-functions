@@ -90,7 +90,8 @@ def run_one_retraining(
         MNLI_TRAINING_SCRIPT_NAME,
         dir_name, output_dir
     ])
-    remote_utils.scp_file_to_remote(
+    client = remote_utils.ScpClient()
+    client.scp_file_to_remote(
         local_file_name=dir_name,
         remote_file_name=os.path.join(
             constants.REMOTE_DEFAULT_REMOTE_BASE_DIR,
