@@ -186,10 +186,11 @@ def maybe_download_file_from_remote_server(
 ) -> None:
     """Check if `local_file_name` exists, or scp from `remote_file_name` if not."""
     if os.path.exists(local_file_name):
-        print("Local file exists")
+        print(f"Local file {local_file_name} exists")
         return
 
-    print("Local file does not exist, syncing from remote server")
+    print(f"Local file {local_file_name} does not exist, "
+          f"syncing from remote {remote_file_name}")
     if remote_file_name is None:
         raise ValueError
 
