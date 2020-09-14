@@ -1,9 +1,13 @@
+import os
 import torch
+import shutil
+import pandas as pd
 from transformers import (
     BertTokenizer,
     InputFeatures,
     default_data_collator)
 from typing import Tuple, Optional, Union, List, Dict
+from experiments import constants
 
 
 def decode_one_example(
@@ -64,3 +68,20 @@ def get_data_from_features_or_inputs(
         logits=None)
     premise, hypothesis = X.split("[CLS]")[1].split("[SEP]")[:2]
     return premise.strip(), hypothesis.strip(), Y
+
+def get_label_to_indices_map() -> Dict[str, List[int]]:
+    with open(constants.MNLI_TRAIN_FILE_NAME) as f:
+        lines = f.readlines()
+
+    data_frame = pd.DataFrame(
+        [line.strip().split("\t") for line in lines[1:]],
+        columns=lines[0].strip().split("\t"))
+
+    return {
+        "contradiction": (
+            data_frame[data_frame.gold_label == "contradiction"].index),
+        "entailment": (
+            data_frame[data_frame.gold_label == "entailment"].index),
+        "neutral": (
+            data_frame[data_frame.gold_label == "neutral"].index),
+    }
