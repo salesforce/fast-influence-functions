@@ -119,3 +119,24 @@ def get_label_to_indices_map() -> Dict[str, List[int]]:
         "neutral": (
             data_frame[data_frame.gold_label == "neutral"].index),
     }
+
+
+def get_label_to_indices_map_2() -> Dict[str, List[int]]:
+    """Slower, deprecated"""
+    contradiction_indices = []
+    entailment_indices = []
+    neutral_indices = []
+    train_inputs_collections = torch.load(constants.MNLI_TRAIN_INPUT_COLLECTIONS_PATH)
+    for index, train_inputs in enumerate(train_inputs_collections):
+        if train_inputs["labels"].item() == 0:
+            contradiction_indices.append(index)
+        if train_inputs["labels"].item() == 1:
+            entailment_indices.append(index)
+        if train_inputs["labels"].item() == 2:
+            neutral_indices.append(index)
+
+    return {
+        "contradiction": contradiction_indices,
+        "entailment": entailment_indices,
+        "neutral": neutral_indices,
+    }

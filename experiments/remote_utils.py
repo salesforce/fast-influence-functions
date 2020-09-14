@@ -222,26 +222,6 @@ def load_file_from_local_or_remote(
     return torch.load(local_file_name)
 
 
-def get_label_to_indices_map() -> Dict[str, List[int]]:
-    contradiction_indices = []
-    entailment_indices = []
-    neutral_indices = []
-    train_inputs_collections = torch.load(constants.MNLI_TRAIN_INPUT_COLLECTIONS_PATH)
-    for index, train_inputs in enumerate(train_inputs_collections):
-        if train_inputs["labels"].item() == 0:
-            contradiction_indices.append(index)
-        if train_inputs["labels"].item() == 1:
-            entailment_indices.append(index)
-        if train_inputs["labels"].item() == 2:
-            neutral_indices.append(index)
-
-    return {
-        "contradiction": contradiction_indices,
-        "entailment": entailment_indices,
-        "neutral": neutral_indices,
-    }
-
-
 def test_save_and_mirror_scp_to_remote():
     import torch  # Only importing torch here
     tensor = torch.rand(100, 100)
