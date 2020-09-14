@@ -24,61 +24,78 @@ from experiments.data_utils import (
     glue_compute_metrics)
 
 
+INFLUENCE_OUTPUT_BASE_DIR = "/export/share/hguo/Experiments/20200904/"
 MNLI_TRAINING_SCRIPT_NAME = "scripts/run_MNLI.20200913.sh"
+NUM_DATAPOINTS_TO_REMOVE_CHOICES = [1, 100, 10000]
 
 
 def run_retraining_main(
         mode: str,
         num_examples_to_test: int):
 
-    # Load file from local or sync from remote
-    full_influences = misc_utils.load_file_from_local_or_remote()
-    KNN_1000_influences = misc_utils.load_file_from_local_or_remote()
-    KNN_10000_influences = misc_utils.load_file_from_local_or_remote()
+    if mode not in ["full", "KNN-1000", "KNN-10000", "random"]:
+        raise ValueError(f"Unrecognized `mode` {mode}")
 
-    full_helpful_influences = misc_utils.sort_dict_keys_by_vals(
-        full_influences["influences"])
-    KNN_1000_helpful_indices = misc_utils.sort_dict_keys_by_vals(
-        KNN_1000_influences["influences"])
-    KNN_10000_helpful_indices = misc_utils.sort_dict_keys_by_vals(
-        KNN_10000_influences["influences"])
+    for example_index in range(num_examples_to_test):
+        for correct_mode in ["correct", "incorrect"]:
+            if mode in ["full", "KNN-1000", "KNN-10000"]:
+                # Load file from local or sync from remote
+                if mode == "full":
+                    file_name = (
+                        INFLUENCE_OUTPUT_BASE_DIR,
+                        f"KNN-recall.only-{correct_mode}.50.{example_index}"
+                        f".pth.sfr-pod-nazneen-rajani")
+                influences_dict = misc_utils.load_file_from_local_or_remote(
+                    local_file_name=file_name,
+                    remote_file_name=file_name)
+                helpful_indices = misc_utils.sort_dict_keys_by_vals(
+                    influences_dict["influences"])
+                harmful_indices = helpful_indices[::-1]
+                indices_dict = {
+                    "helpful": helpful_indices,
+                    "harmful": harmful_indices}
 
-    full_harmful_influences = full_helpful_influences[::-1]
-    KNN_1000_harmful_indices = KNN_1000_helpful_indices[::-1]
-    KNN_10000_harmful_indices = KNN_10000_helpful_indices[::-1]
+            if mode == "random":
+                # Get indices corresponding to each label
+                label_to_indices = mnli_utils.get_label_to_indices_map()
+                indices_dict = {
+                    "neutral": label_to_indices["neutral"],
+                    "entailment": label_to_indices["entailment"],
+                    "contradiction": label_to_indices["contradiction"],
+                }
 
-    # Get indices corresponding to each label
-    label_to_indices = mnli_utils.get_label_to_indices_map()
-    random_neutral_indices = label_to_indices["neutral"]
-    random_entailment_indices = label_to_indices["entailment"]
-    random_contradiction_indices = label_to_indices["contradiction"]
+            for tag, indices in indices_dict.items():
+                for num_data_points_to_remove in NUM_DATAPOINTS_TO_REMOVE_CHOICES:
+                    run_one_retraining(
+                        indices=indices[:num_data_points_to_remove],
+                        dir_name=os.path.join(
+                            constants.REMOTE_DEFAULT_REMOTE_BASE_DIR,
+                            f"./retraining-remove-"
+                            f"{example_index}-"
+                            f"{correct_mode}-"
+                            f"{mode}-"
+                            f"{tag}-"
+                            f"{num_data_points_to_remove}"))
 
-    for num_data_points_to_remove in [1, 100, 10000]:
-        for indices in [
-            full_helpful_influences,
-            KNN_1000_helpful_indices,
-            KNN_10000_helpful_indices,
-            full_harmful_influences,
-            KNN_1000_harmful_indices,
-            KNN_10000_harmful_indices,
-            random_neutral_indices,
-            random_entailment_indices,
-            random_contradiction_indices,
-        ]:
-            data_dir = mnli_utils.create_one_set_of_data_for_retraining(
-                indices[:num_data_points_to_remove])
-            output_dir = os.path.join(data_dir, "output_dir")
-            output_dir = os.path.abspath(output_dir)
-            subprocess.check_call([
-                "bash",
-                MNLI_TRAINING_SCRIPT_NAME,
-                data_dir, output_dir
-            ])
-            remote_utils.scp_file_to_remote(
-                local_file_name=output_dir,
-                remote_file_name=output_dir,
-                # This is a folder
-                recursive=True)
+
+def run_one_retraining(
+        indices: List[int],
+        dir_name: str,
+) -> None:
+    mnli_utils.create_one_set_of_data_for_retraining(
+        dir_name=dir_name,
+        indices_to_remove=indices)
+    output_dir = os.path.join(dir_name, "output_dir")
+    subprocess.check_call([
+        "bash",
+        MNLI_TRAINING_SCRIPT_NAME,
+        dir_name, output_dir
+    ])
+    remote_utils.scp_file_to_remote(
+        local_file_name=dir_name,
+        remote_file_name=dir_name,
+        # This is a folder
+        recursive=True)
 
 
 def run_full_influence_functions(
