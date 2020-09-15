@@ -48,6 +48,9 @@ Switching gear towards downstream tasks
 * Edited the configuration files for running in different environments.
 * Added demo. To run the demo, do `~/.local/bin/streamlit run run_demo.py`
 * Added `graph_tool` to `Dockerfile.external`
+* Support non-parallel settings in experiments.
+* Added retraining experiments.
+
 
 ### Minor Changes
 * Added the missing `.gitignore`.
@@ -56,4 +59,7 @@ Switching gear towards downstream tasks
 * `experiments/constants.py`: added more constants used in `experiments.remote_utils.py`
 * `experiments/misc_utils.py`: added a few more useful tools.
 * Updated `requirements.txt` with libraries used in `experiments/remote_utils.py`
+* Added a few more configurations to `cluster/`
+* Added a few more constants to `experiments/constants.py`
+* Improved flexibility of the demo and visualization.
 
