@@ -95,7 +95,7 @@ def run_one_retraining(
         local_file_name=dir_name,
         remote_file_name=os.path.join(
             constants.REMOTE_DEFAULT_REMOTE_BASE_DIR,
-            dir_name),
+            f"{dir_name}.{client.host_name}"),
         # This is a folder
         recursive=True)
 

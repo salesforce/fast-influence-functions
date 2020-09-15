@@ -115,6 +115,10 @@ class ScpClient(object):
                     key_filename=ssh_key_filename)
         self._ssh = ssh
 
+    @property
+    def host_name(self):
+        return socket.gethostname()
+
     def scp_file_to_remote(
             self,
             local_file_name: str,
@@ -161,8 +165,7 @@ def save_and_mirror_scp_to_remote(
         server_password=server_password,
         ssh_key_filename=ssh_key_filename)
 
-    host_name = socket.gethostname()
-    remote_file_name = f"{file_name}.{host_name}"
+    remote_file_name = f"{file_name}.{client.host_name}"
     if constants.REMOTE_DEFAULT_REMOTE_BASE_DIR is not None:
         remote_file_name = os.path.join(
             constants.REMOTE_DEFAULT_REMOTE_BASE_DIR,
