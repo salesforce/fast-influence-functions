@@ -22,6 +22,7 @@ class ExperimentalDemoInfluenceHelper(object):
         train_task_name: str,
         eval_task_name: str,
         hans_heuristic: Optional[str] = None,
+        trained_on_task_name: Optional[str] = None,
     ) -> None:
 
         if train_task_name not in ["mnli-2", "hans"]:
@@ -30,10 +31,19 @@ class ExperimentalDemoInfluenceHelper(object):
         if eval_task_name not in ["mnli-2", "hans"]:
             raise ValueError
 
-        tokenizer, model = misc_utils.create_tokenizer_and_model(
-            constants.MNLI2_MODEL_PATH)
-        model.cuda()
+        if trained_on_task_name not in ["mnli-2", "hans"]:
+            raise ValueError
 
+        # `trained_on_task_name` determines the model to load
+        if trained_on_task_name in ["mnli-2"]:
+            tokenizer, model = misc_utils.create_tokenizer_and_model(
+                constants.MNLI2_MODEL_PATH)
+
+        if trained_on_task_name in ["hans"]:
+            tokenizer, model = misc_utils.create_tokenizer_and_model(
+                constants.HANS_MODEL_PATH)
+
+        model.cuda()
         train_dataset, _ = misc_utils.create_datasets(
             task_name=train_task_name,
             tokenizer=tokenizer)
@@ -42,9 +52,18 @@ class ExperimentalDemoInfluenceHelper(object):
             task_name=eval_task_name,
             tokenizer=tokenizer)
 
-        if train_task_name == "mnli-2":
+        if trained_on_task_name == "mnli-2" and train_task_name == "mnli-2":
             faiss_index = faiss_utils.FAISSIndex(768, "Flat")
             faiss_index.load(constants.MNLI2_FAISS_INDEX_PATH)
+        elif trained_on_task_name == "hans" and train_task_name == "hans":
+            faiss_index = faiss_utils.FAISSIndex(768, "Flat")
+            faiss_index.load(constants.HANS_FAISS_INDEX_PATH)
+        elif trained_on_task_name == "mnli-2" and eval_task_name == "hans":
+            faiss_index = faiss_utils.FAISSIndex(768, "Flat")
+            faiss_index.load(constants.MNLI2_HANS_FAISS_INDEX_PATH)
+        elif trained_on_task_name == "hans" and train_task_name == "mnli-2":
+            faiss_index = faiss_utils.FAISSIndex(768, "Flat")
+            faiss_index.load(constants.HANS_MNLI2_FAISS_INDEX_PATH)
         else:
             faiss_index = None
 
@@ -78,15 +97,26 @@ class ExperimentalDemoInfluenceHelper(object):
             n for n, p in model.named_parameters()
             if not p.requires_grad]
 
-        if eval_task_name == "mnli-2":
+        # Other settings are not supported as of now
+        if trained_on_task_name == "mnli-2" and eval_task_name == "mnli-2":
             s_test_damp = 5e-3
             s_test_scale = 1e4
             s_test_num_samples = 1000
 
-        if eval_task_name == "hans":
+        if trained_on_task_name == "hans" and eval_task_name == "hans":
+            s_test_damp = 5e-3
+            s_test_scale = 1e6
+            s_test_num_samples = 2000
+
+        if trained_on_task_name == "mnli-2" and eval_task_name == "hans":
             s_test_damp = 5e-3
             s_test_scale = 1e6
             s_test_num_samples = 1000
+
+        if trained_on_task_name == "hans" and train_task_name == "mnli-2":
+            s_test_damp = 5e-3
+            s_test_scale = 1e6
+            s_test_num_samples = 2000
 
         self._model = model
         self._tokenizer = tokenizer
@@ -201,11 +231,11 @@ def load_dataset(name: str) -> pd.DataFrame:
         raise ValueError
 
     if name in ["mnli", "mnli-2"]:
-        file_name = "/export/share/hguo/Data/Glue/MNLI/dev_matched.tsv"
+        file_name = constants.MNLI_EVAL_MATCHED_FILE_NAME
         columns = ["index", "sentence1", "sentence2", "gold_label"]
 
     if name == "hans":
-        file_name = "/export/share/hguo/Data/HANS/heuristics_evaluation_set.txt"
+        file_name = constants.HANS_EVAL_FILE_NAME
         columns = ["heuristic", "sentence1", "sentence2", "gold_label"]
 
     data = pd.read_csv(file_name, sep="\t")

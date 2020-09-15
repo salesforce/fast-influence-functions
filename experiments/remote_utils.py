@@ -9,7 +9,7 @@ import yagmail
 from scp import SCPClient
 from paramiko import SSHClient
 from transformers import trainer_utils
-from typing import List, Optional, Any, Tuple
+from typing import List, Optional, Any, Tuple, Dict
 
 from experiments import misc_utils
 from experiments import constants
@@ -115,21 +115,29 @@ class ScpClient(object):
                     key_filename=ssh_key_filename)
         self._ssh = ssh
 
+    @property
+    def host_name(self):
+        return socket.gethostname()
+
     def scp_file_to_remote(
             self,
             local_file_name: str,
-            remote_file_name: str) -> None:
+            remote_file_name: str,
+            recursive: bool = False) -> None:
         with SCPClient(self._ssh.get_transport()) as scp:
             scp.put(files=local_file_name,
-                    remote_path=remote_file_name)
+                    remote_path=remote_file_name,
+                    recursive=recursive)
 
     def scp_file_from_remote(
             self,
             local_file_name: str,
-            remote_file_name: str) -> None:
+            remote_file_name: str,
+            recursive: bool = False) -> None:
         with SCPClient(self._ssh.get_transport()) as scp:
             scp.get(remote_path=remote_file_name,
-                    local_path=local_file_name)
+                    local_path=local_file_name,
+                    recursive=recursive)
 
     def save_and_mirror_scp_to_remote(
             self,
@@ -157,8 +165,7 @@ def save_and_mirror_scp_to_remote(
         server_password=server_password,
         ssh_key_filename=ssh_key_filename)
 
-    host_name = socket.gethostname()
-    remote_file_name = f"{file_name}.{host_name}"
+    remote_file_name = f"{file_name}.{client.host_name}"
     if constants.REMOTE_DEFAULT_REMOTE_BASE_DIR is not None:
         remote_file_name = os.path.join(
             constants.REMOTE_DEFAULT_REMOTE_BASE_DIR,
@@ -170,6 +177,53 @@ def save_and_mirror_scp_to_remote(
         remote_file_name=remote_file_name)
 
     return client, remote_file_name
+
+
+def maybe_download_file_from_remote_server(
+        local_file_name: str,
+        remote_file_name: Optional[str] = None,
+        server_address: Optional[str] = None,
+        server_username: Optional[str] = None,
+        server_password: Optional[str] = None,
+        ssh_key_filename: Optional[str] = None
+) -> None:
+    """Check if `local_file_name` exists, or scp from `remote_file_name` if not."""
+    if os.path.exists(local_file_name):
+        print(f"Local file {local_file_name} exists")
+        return
+
+    print(f"Local file {local_file_name} does not exist, "
+          f"syncing from remote {remote_file_name}")
+    if remote_file_name is None:
+        raise ValueError
+
+    client = ScpClient(
+        server_address=server_address,
+        server_username=server_username,
+        server_password=server_password,
+        ssh_key_filename=ssh_key_filename)
+
+    client.scp_file_from_remote(
+        local_file_name=local_file_name,
+        remote_file_name=remote_file_name)
+
+
+def load_file_from_local_or_remote(
+        local_file_name: str,
+        remote_file_name: Optional[str] = None,
+        server_address: Optional[str] = None,
+        server_username: Optional[str] = None,
+        server_password: Optional[str] = None,
+        ssh_key_filename: Optional[str] = None
+) -> Any:
+    """Load `local_file_name` if exists, or download + load
+       `remote_file_name` to `local_file_name` if not
+    """
+    maybe_download_file_from_remote_server(
+        local_file_name=local_file_name,
+        remote_file_name=remote_file_name)
+
+    return torch.load(local_file_name)
 
 
 def test_save_and_mirror_scp_to_remote():

@@ -192,3 +192,12 @@ def is_prediction_correct(
         raise ValueError("This function only works on instances.")
 
     return (preds.argmax(axis=-1) == label_ids).all()
+
+
+def move_inputs_to_device(
+        inputs: Dict[str, Any],
+        device: torch.device
+) -> None:
+    for k, v in inputs.items():
+        if isinstance(v, torch.Tensor):
+            inputs[k] = v.to(device)

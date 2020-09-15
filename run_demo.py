@@ -9,9 +9,10 @@ def setup():
     with st.spinner("Loading Model and Dataset"):
         data = demo_utils.load_dataset("hans")
         helper = demo_utils.ExperimentalDemoInfluenceHelper(
-            train_task_name="mnli-2",
+            train_task_name="hans",
             eval_task_name="hans",
-            hans_heuristic="lexical_overlap")
+            hans_heuristic="lexical_overlap",
+            trained_on_task_name="mnli-2")
 
     return data, helper
 

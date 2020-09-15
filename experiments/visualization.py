@@ -1,15 +1,15 @@
 import torch
 import numpy as np
-import graph_tool as gt
 from tqdm import tqdm, trange
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
-from graph_tool.draw import graph_draw
-from joblib import Parallel, delayed
+# from graph_tool.draw import graph_draw
+# from joblib import Parallel, delayed
 
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Union, Callable
 from influence_utils import faiss_utils
 from influence_utils import parallel
+from influence_utils import nn_influence_utils
 from experiments.visualization_utils import (
     get_circle_coordinates,
     get_within_circle_constraint,
@@ -18,18 +18,37 @@ from experiments.visualization_utils import (
     distance_to_points_within_circle_vectorized)
 from experiments import constants
 from experiments import misc_utils
+from experiments import remote_utils
 from experiments.hans_utils import HansHelper
 from transformers import Trainer, TrainingArguments
 
 
-KNN_K = 1000
+try:
+    import graph_tool as gt
+    gt_Graph_t = gt.Graph
+except ModuleNotFoundError:
+    # We do not need `graph_tool` unless
+    # visualization is to be created
+    gt = None
+    gt_Graph_t = "gt.Graph"
+
+DEFAULT_KNN_K = 1000
+DEFAULT_TRAIN_VERTEX_COLOR = 0
+DEFAULT_TRAIN_VERTEX_RADIUS = 2
+DEFAULT_EVAL_VERTEX_COLORS_BASE = 2
+DEFAULT_EVAL_VERTEX_RADIUS = 3
+DEFAULT_HELPFUL_EDGE_COLOR = 0
+DEFAULT_HARMFUL_EDGE_COLOR = 1
+DEFAULT_TRAIN_VERTEX_SIZE = 3
 
 
 def main(
     train_task_name: str,
     eval_task_name: str,
     num_eval_to_collect: int,
+    use_parallel: bool = True,
     hans_heuristic: Optional[str] = None,
+    trained_on_task_name: Optional[str] = None,
 ) -> List[Dict[int, float]]:
 
     if train_task_name not in ["mnli-2", "hans"]:
@@ -38,8 +57,24 @@ def main(
     if eval_task_name not in ["mnli-2", "hans"]:
         raise ValueError
 
-    tokenizer, model = misc_utils.create_tokenizer_and_model(
-        constants.MNLI2_MODEL_PATH)
+    if trained_on_task_name is None:
+        # The task the model was trained on
+        # can be different from `train_task_name`
+        # which is used to determine on which the
+        # influence values will be computed.
+        trained_on_task_name = train_task_name
+
+    if trained_on_task_name not in ["mnli-2", "hans"]:
+        raise ValueError
+
+    # `trained_on_task_name` determines the model to load
+    if trained_on_task_name in ["mnli-2"]:
+        tokenizer, model = misc_utils.create_tokenizer_and_model(
+            constants.MNLI2_MODEL_PATH)
+
+    if trained_on_task_name in ["hans"]:
+        tokenizer, model = misc_utils.create_tokenizer_and_model(
+            constants.HANS_MODEL_PATH)
 
     train_dataset, _ = misc_utils.create_datasets(
         task_name=train_task_name,
@@ -49,9 +84,18 @@ def main(
         task_name=eval_task_name,
         tokenizer=tokenizer)
 
-    if train_task_name == "mnli-2":
+    if trained_on_task_name == "mnli-2" and train_task_name == "mnli-2":
         faiss_index = faiss_utils.FAISSIndex(768, "Flat")
         faiss_index.load(constants.MNLI2_FAISS_INDEX_PATH)
+    elif trained_on_task_name == "hans" and train_task_name == "hans":
+        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
+        faiss_index.load(constants.HANS_FAISS_INDEX_PATH)
+    elif trained_on_task_name == "mnli-2" and train_task_name == "hans":
+        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
+        faiss_index.load(constants.MNLI2_HANS_FAISS_INDEX_PATH)
+    elif trained_on_task_name == "hans" and train_task_name == "mnli-2":
+        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
+        faiss_index.load(constants.HANS_MNLI2_FAISS_INDEX_PATH)
     else:
         faiss_index = None
 
@@ -107,15 +151,26 @@ def main(
         n for n, p in model.named_parameters()
         if not p.requires_grad]
 
-    if eval_task_name == "mnli-2":
+    # Other settings are not supported as of now
+    if trained_on_task_name == "mnli-2" and eval_task_name == "mnli-2":
         s_test_damp = 5e-3
         s_test_scale = 1e4
         s_test_num_samples = 1000
 
-    if eval_task_name == "hans":
+    if trained_on_task_name == "hans" and eval_task_name == "hans":
+        s_test_damp = 5e-3
+        s_test_scale = 1e6
+        s_test_num_samples = 2000
+
+    if trained_on_task_name == "mnli-2" and eval_task_name == "hans":
         s_test_damp = 5e-3
         s_test_scale = 1e6
         s_test_num_samples = 1000
+
+    if trained_on_task_name == "hans" and eval_task_name == "mnli-2":
+        s_test_damp = 5e-3
+        s_test_scale = 1e6
+        s_test_num_samples = 2000
 
     influences_collections = []
     for index, inputs in enumerate(wrong_input_collections[:num_eval_to_collect]):
@@ -124,44 +179,64 @@ def main(
             features = misc_utils.compute_BERT_CLS_feature(model, **inputs)
             features = features.cpu().detach().numpy()
             KNN_distances, KNN_indices = faiss_index.search(
-                k=KNN_K, queries=features)
+                k=DEFAULT_KNN_K, queries=features)
         else:
             KNN_indices = None
 
-        # influences, _, _ = nn_influence_utils.compute_influences(
-        #     n_gpu=1,
-        #     device=torch.device("cuda"),
-        #     batch_train_data_loader=batch_train_data_loader,
-        #     instance_train_data_loader=instance_train_data_loader,
-        #     model=model,
-        #     test_inputs=inputs,
-        #     params_filter=params_filter,
-        #     weight_decay=constants.WEIGHT_DECAY,
-        #     weight_decay_ignores=weight_decay_ignores,
-        #     s_test_damp=s_test_damp,
-        #     s_test_scale=s_test_scale,
-        #     s_test_num_samples=s_test_num_samples,
-        #     train_indices_to_include=KNN_indices,
-        #     precomputed_s_test=None)
+        if not use_parallel:
+            model.cuda()
+            batch_train_data_loader = misc_utils.get_dataloader(
+                train_dataset,
+                batch_size=1,
+                random=True)
 
-        influences, _ = parallel.compute_influences_parallel(
-            # Avoid clash with main process
-            device_ids=[0, 1, 2, 3],
-            train_dataset=train_dataset,
-            batch_size=1,
-            model=model,
-            test_inputs=inputs,
-            params_filter=params_filter,
-            weight_decay=constants.WEIGHT_DECAY,
-            weight_decay_ignores=weight_decay_ignores,
-            s_test_damp=s_test_damp,
-            s_test_scale=s_test_scale,
-            s_test_num_samples=s_test_num_samples,
-            train_indices_to_include=KNN_indices,
-            return_s_test=False,
-            debug=False)
+            instance_train_data_loader = misc_utils.get_dataloader(
+                train_dataset,
+                batch_size=1,
+                random=False)
+
+            influences, _, _ = nn_influence_utils.compute_influences(
+                n_gpu=1,
+                device=torch.device("cuda"),
+                batch_train_data_loader=batch_train_data_loader,
+                instance_train_data_loader=instance_train_data_loader,
+                model=model,
+                test_inputs=inputs,
+                params_filter=params_filter,
+                weight_decay=constants.WEIGHT_DECAY,
+                weight_decay_ignores=weight_decay_ignores,
+                s_test_damp=s_test_damp,
+                s_test_scale=s_test_scale,
+                s_test_num_samples=s_test_num_samples,
+                train_indices_to_include=KNN_indices,
+                precomputed_s_test=None)
+        else:
+            influences, _ = parallel.compute_influences_parallel(
+                # Avoid clash with main process
+                device_ids=[0, 1, 2, 3],
+                train_dataset=train_dataset,
+                batch_size=1,
+                model=model,
+                test_inputs=inputs,
+                params_filter=params_filter,
+                weight_decay=constants.WEIGHT_DECAY,
+                weight_decay_ignores=weight_decay_ignores,
+                s_test_damp=s_test_damp,
+                s_test_scale=s_test_scale,
+                s_test_num_samples=s_test_num_samples,
+                train_indices_to_include=KNN_indices,
+                return_s_test=False,
+                debug=False)
 
         influences_collections.append(influences)
+
+    remote_utils.save_and_mirror_scp_to_remote(
+        object_to_save=influences_collections,
+        file_name=(
+            f"visualization.{num_eval_to_collect}"
+            f".{train_task_name}-{eval_task_name}"
+            f"-{hans_heuristic}-{trained_on_task_name}"
+            f".{use_parallel}.pth"))
 
     return influences_collections
 
@@ -222,9 +297,34 @@ def get_datapoints_map(
 
 
 def get_graph(
-        influences_collections_list: List[List[Dict[int, float]]]
-) -> gt.Graph:
+        influences_collections_list: List[List[Dict[int, float]]],
+        train_vertex_color_map_fn: Optional[Callable[[int], int]] = None,
+        train_vertex_radius_map_fn: Optional[Callable[[int], int]] = None,
+        eval_vertex_radius: Optional[int] = None,
+        eval_vertex_color_base: Optional[int] = None,
+) -> gt_Graph_t:
 
+    if train_vertex_color_map_fn is None:
+        def train_vertex_color_map_fn(index: int) -> int:
+            return DEFAULT_TRAIN_VERTEX_COLOR
+
+    if train_vertex_radius_map_fn is None:
+        def train_vertex_radius_map_fn(index: int) -> int:
+            return DEFAULT_TRAIN_VERTEX_RADIUS
+
+    if eval_vertex_radius is None:
+        eval_vertex_radius = DEFAULT_EVAL_VERTEX_RADIUS
+
+    if eval_vertex_color_base is None:
+        eval_vertex_color_base = DEFAULT_EVAL_VERTEX_COLORS_BASE
+
+    if train_vertex_color_map_fn is None:
+        raise ValueError
+
+    if train_vertex_radius_map_fn is None:
+        raise ValueError
+
+    NUM_INFLUENCE_COLLECTIONS = len(influences_collections_list)
     influences_collections_list_flatten = []
     for influences_collections in influences_collections_list:
         # Assume they all have the same lengths
@@ -245,6 +345,7 @@ def get_graph(
     # Vertex properties
     v_sizes = g.new_vertex_property("int")
     v_colors = g.new_vertex_property("int")
+    v_radius = g.new_vertex_property("int")
     v_data_indices = g.new_vertex_property("string")
     v_positions = g.new_vertex_property("vector<double>")
     v_positive_positions = g.new_vertex_property("vector<double>")
@@ -253,21 +354,15 @@ def get_graph(
     train_vertices = []
     eval_vertices_collections = []
 
-    NUM_INFLUENCE_COLLECTIONS = len(influences_collections_list)
-    VERTEX_COLORS = range(2, 2 + NUM_INFLUENCE_COLLECTIONS)
-    HELPFUL_EDGE_COLOR = 0
-    HARMFUL_EDGE_COLOR = 1
-    TRAIN_VERTEX_SIZE = 3
-    TRAIN_VERTEX_COLOR = 0
-    EVAL_VERTICES_RADIUS = 3
-    TRAIN_VERTICES_RADIUS = 2
-
     # Add train vertices
     for datapoint_index in trange(len(possible_datapoints)):
         v = g.add_vertex()
-        v_sizes[v] = TRAIN_VERTEX_SIZE
-        v_colors[v] = TRAIN_VERTEX_COLOR
-        v_data_indices[v] = f"train-{datapoint_index}"
+        v_sizes[v] = DEFAULT_TRAIN_VERTEX_SIZE
+        v_colors[v] = train_vertex_color_map_fn(
+            possible_datapoints[datapoint_index])
+        v_radius[v] = train_vertex_radius_map_fn(
+            possible_datapoints[datapoint_index])
+        v_data_indices[v] = f"train-{possible_datapoints[datapoint_index]}"
         train_vertices.append(v)
 
     # Add eval vertices
@@ -277,13 +372,14 @@ def get_graph(
         for datapoint_index in trange(len(influences_collections)):
             v = g.add_vertex()
             v_sizes[v] = 10
-            v_colors[v] = VERTEX_COLORS[i]
-            v_data_indices[v] = f"A_eval-{datapoint_index}"
+            v_colors[v] = eval_vertex_color_base + i
+            v_radius[v] = eval_vertex_radius
+            v_data_indices[v] = f"eval-{i}-{datapoint_index}"
 
             base_degree = (360 / NUM_INFLUENCE_COLLECTIONS) * i
             fine_degree = (360 / NUM_INFLUENCE_COLLECTIONS / len(influences_collections)) * datapoint_index
             x_y_coordinate = get_circle_coordinates(
-                r=EVAL_VERTICES_RADIUS,
+                r=eval_vertex_radius,
                 degree=base_degree + fine_degree)
             position = np.random.normal(x_y_coordinate, 0.1)
             v_positions[v] = position
@@ -303,7 +399,7 @@ def get_graph(
                     train_vertex = train_vertices[datapoints_map[train_index]]
                     eval_vertex = eval_vertices[eval_index]
                     e = g.add_edge(train_vertex, eval_vertex)
-                    e_colors[e] = HELPFUL_EDGE_COLOR
+                    e_colors[e] = DEFAULT_HELPFUL_EDGE_COLOR
                     e_weights[e] = np.abs(train_influence)
                     e_signed_influences[e] = train_influence
                     e_unsigned_influences[e] = np.abs(train_influence)
@@ -311,7 +407,7 @@ def get_graph(
                     train_vertex = train_vertices[datapoints_map[train_index]]
                     eval_vertex = eval_vertices[eval_index]
                     e = g.add_edge(train_vertex, eval_vertex)
-                    e_colors[e] = HARMFUL_EDGE_COLOR
+                    e_colors[e] = DEFAULT_HARMFUL_EDGE_COLOR
                     e_weights[e] = np.abs(train_influence)
                     e_signed_influences[e] = train_influence
                     e_unsigned_influences[e] = np.abs(train_influence)
@@ -340,10 +436,10 @@ def get_graph(
                 _negative_influences.append(e_unsigned_influences[e])
 
         # `minimize` might fail using `np.sqrt(2)` for some reasons :\
-        bound = 1.4 * TRAIN_VERTICES_RADIUS
+        bound = 1.4 * v_radius[train_vertex]
         constraints = ({
             "type": "ineq",
-            "fun": get_within_circle_constraint(TRAIN_VERTICES_RADIUS)
+            "fun": get_within_circle_constraint(v_radius[train_vertex])
         })
 
         if len(_positive_influences) == 0:
@@ -400,6 +496,7 @@ def get_graph(
     # Assign Vertex properties
     g.vertex_properties["sizes"] = v_sizes
     g.vertex_properties["colors"] = v_colors
+    g.vertex_properties["radius"] = v_radius
     g.vertex_properties["data_indices"] = v_data_indices
     g.vertex_properties["positions"] = v_positions
     g.vertex_properties["positive_positions"] = v_positive_positions

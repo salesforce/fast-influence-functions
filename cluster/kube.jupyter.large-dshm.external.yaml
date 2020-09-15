@@ -1,0 +1,49 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fast-influence-functions
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: OnFailure
+      # kubectl create secret generic docker-hub-hg \
+      # --from-file=.dockerconfigjson=/nas/longleaf/home/hanhan1/.docker/config.json \
+      # --type=kubernetes.io/dockerconfigjson
+      imagePullSecrets:
+      - name: docker-hub-hg
+      # Set the security context for a Pod
+      securityContext:
+        runAsUser: 259446
+        fsGroup: 3406
+
+      # mount host directories into pod
+      volumes:
+      - name: nlp
+        hostPath:
+          # directory location on host
+          path: /proj/bansallab/users
+
+      containers:
+      - name: fast-influence-functions
+        image: hanguo97/fast-influence-functions:IMAGE_TAG
+        imagePullPolicy: Always
+        resources:
+          # You can specify GPU limits without specifying requests
+          # because Kubernetes will use the limit as the request value by default.
+          requests:
+            cpu: 32
+            memory: 128Gi
+          limits:
+            cpu: 32
+            memory: 128Gi
+            nvidia.com/gpu: 4
+
+        volumeMounts:
+        # name must match the volume name defined in volumes
+        - name: nlp
+          # mount path within the container
+          mountPath: /nlp
+
+        command: ["/bin/bash"]
+        args: ["-c", "cd fast-influence-functions/ && git config --global credential.helper cache && jupyter-lab --ip=127.0.0.1"]

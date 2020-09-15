@@ -47,6 +47,7 @@ Switching gear towards downstream tasks
 * Copied the GLUE data download script and paste them into `scripts/down_glue_data.py`.
 * Edited the configuration files for running in different environments.
 * Added demo. To run the demo, do `~/.local/bin/streamlit run run_demo.py`
+* Added `graph_tool` to `Dockerfile.external`
 
 ### Minor Changes
 * Added the missing `.gitignore`.

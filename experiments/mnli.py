@@ -1,5 +1,7 @@
+import os
 import time
 import torch
+import subprocess
 import numpy as np
 import matplotlib.pyplot as plt
 import transformers
@@ -12,6 +14,7 @@ from transformers import default_data_collator
 from typing import List, Dict, Tuple, Optional, Union, Any
 
 from experiments import constants
+from experiments import mnli_utils
 from experiments import misc_utils
 from experiments import remote_utils
 from influence_utils import faiss_utils
@@ -21,6 +24,80 @@ from experiments.data_utils import (
     glue_compute_metrics)
 
 
+INFLUENCE_OUTPUT_BASE_DIR = "/export/share/hguo/Experiments/20200904/"
+MNLI_TRAINING_SCRIPT_NAME = "scripts/run_MNLI.20200913.sh"
+NUM_DATAPOINTS_TO_REMOVE_CHOICES = [1, 100, 10000]
+
+
+def run_retraining_main(
+        mode: str,
+        num_examples_to_test: int):
+
+    if mode not in ["full", "KNN-1000", "KNN-10000", "random"]:
+        raise ValueError(f"Unrecognized `mode` {mode}")
+
+    for example_index in range(num_examples_to_test):
+        for correct_mode in ["correct", "incorrect"]:
+            if mode in ["full", "KNN-1000", "KNN-10000"]:
+                # Load file from local or sync from remote
+                if mode == "full":
+                    file_name = os.path.join(
+                        INFLUENCE_OUTPUT_BASE_DIR,
+                        f"KNN-recall.only-{correct_mode}.50.{example_index}"
+                        f".pth.sfr-pod-nazneen-rajani")
+                influences_dict = remote_utils.load_file_from_local_or_remote(
+                    local_file_name=file_name,
+                    remote_file_name=file_name)
+                helpful_indices = misc_utils.sort_dict_keys_by_vals(
+                    influences_dict["influences"])
+                harmful_indices = helpful_indices[::-1]
+                indices_dict = {
+                    "helpful": helpful_indices,
+                    "harmful": harmful_indices}
+
+            if mode == "random":
+                # Get indices corresponding to each label
+                label_to_indices = mnli_utils.get_label_to_indices_map()
+                indices_dict = {
+                    "neutral": label_to_indices["neutral"],
+                    "entailment": label_to_indices["entailment"],
+                    "contradiction": label_to_indices["contradiction"],
+                }
+
+            for tag, indices in indices_dict.items():
+                for num_data_points_to_remove in NUM_DATAPOINTS_TO_REMOVE_CHOICES:
+                    run_one_retraining(
+                        indices=indices[:num_data_points_to_remove],
+                        dir_name=(
+                            f"./retraining-remove-"
+                            f"{example_index}-"
+                            f"{correct_mode}-"
+                            f"{mode}-"
+                            f"{tag}-"
+                            f"{num_data_points_to_remove}"))
+
+
+def run_one_retraining(
+        indices: List[int],
+        dir_name: str,
+) -> None:
+    mnli_utils.create_one_set_of_data_for_retraining(
+        dir_name=dir_name,
+        indices_to_remove=indices)
+    output_dir = os.path.join(dir_name, "output_dir")
+    subprocess.check_call([
+        "bash",
+        MNLI_TRAINING_SCRIPT_NAME,
+        dir_name, output_dir
+    ])
+    client = remote_utils.ScpClient()
+    client.scp_file_to_remote(
+        local_file_name=dir_name,
+        remote_file_name=os.path.join(
+            constants.REMOTE_DEFAULT_REMOTE_BASE_DIR,
+            f"{dir_name}.{client.host_name}"),
+        # This is a folder
+        recursive=True)
 
 
 def run_full_influence_functions(
@@ -132,16 +209,17 @@ def run_full_influence_functions(
                 s_test_iterations=1,
                 precomputed_s_test=None)
 
-            num_examples_tested += 1
-            outputs_collections[test_index] = {
+            outputs = {
                 "influences": influences,
                 "s_test": s_test,
                 "time": timer.elapsed,
                 "correct": prediction_is_correct,
             }
+            num_examples_tested += 1
+            outputs_collections[test_index] = outputs
 
             remote_utils.save_and_mirror_scp_to_remote(
-                object_to_save=outputs_collections[test_index],
+                object_to_save=outputs,
                 file_name=f"KNN-recall.{mode}.{num_examples_to_test}.{test_index}.pth")
             print(f"Status: #{test_index} | {num_examples_tested} / {num_examples_to_test}")
 
@@ -354,7 +432,7 @@ def compute_new_imitator_losses(
             model=imitator_model,
             inputs=imitator_train_inputs,
             params_filter=params_filter,
-            weight_decay=WEIGHT_DECAY,
+            weight_decay=constants.WEIGHT_DECAY,
             weight_decay_ignores=weight_decay_ignores)
 
         _losses = []

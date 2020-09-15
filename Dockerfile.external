@@ -41,7 +41,18 @@ RUN \
 # ---------------------------------------------
 # Project-specific System Dependencies
 # ---------------------------------------------
-# RUN \
+RUN \
+    # Install `graph_tool`
+    # https://git.skewed.de/count0/graph-tool/-/wikis/installation-instructions#debian-ubuntu
+    # and `cairo` https://cairographics.org/download/
+    echo "deb [ arch=amd64 ] https://downloads.skewed.de/apt bionic main" >> /etc/apt/sources.list && \
+    apt-key adv --keyserver keys.openpgp.org --recv-key 612DEFB798507F25 && \
+    apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        python3-graph-tool \
+        libcairo2-dev && \
+    rm -rf /var/lib/apt/lists/* && \
+    # Link the directory to `graph_tool`, which is installed in a differet python path
+    ln -s /usr/lib/python3/dist-packages/graph_tool/ /opt/conda/lib/python3.7/site-packages/graph_tool
     # Clone the Apex Module (this requires torch)
     # git clone https://github.com/NVIDIA/apex /workspace/apex && \
     # cd /workspace/apex && \
@@ -61,7 +72,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
     jupyter lab build && \
     # Unset NODE_OPTIONS environment variable (OS X/Linux)
     unset NODE_OPTIONS && \
-    # for linking path from host machines
+    # for binding/linking path from host machines
+    mkdir -p /nlp && \
     mkdir -p /export/ && \
     chmod -R 777 /export
 

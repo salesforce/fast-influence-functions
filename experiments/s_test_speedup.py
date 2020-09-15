@@ -1,8 +1,12 @@
 import sys
 import torch
+import transformers
+import numpy as np
 from contexttimer import Timer
 from typing import List, Dict, Any
 from transformers import GlueDataset
+from transformers import TrainingArguments
+from transformers import default_data_collator
 
 from influence_utils import parallel
 from influence_utils import faiss_utils
@@ -10,6 +14,10 @@ from influence_utils import nn_influence_utils
 from influence_utils.nn_influence_utils import compute_s_test
 from experiments import constants
 from experiments import misc_utils
+from experiments import remote_utils
+from experiments.data_utils import (
+    glue_output_modes,
+    glue_compute_metrics)
 
 
 def one_experiment(
@@ -58,9 +66,13 @@ def one_experiment(
 
 
 def main(
+    mode: str,
     num_examples_to_test: int = 5,
-    num_repetitions: int = 1,
+    num_repetitions: int = 4,
 ) -> List[Dict[str, Any]]:
+
+    if mode not in ["only-correct", "only-incorrect"]:
+        raise ValueError(f"Unrecognized mode {mode}")
 
     task_tokenizer, task_model = misc_utils.create_tokenizer_and_model(
         constants.MNLI_MODEL_PATH)
@@ -72,11 +84,54 @@ def main(
         batch_size=1,
         random=False)
 
+    output_mode = glue_output_modes["mnli"]
+
+    def build_compute_metrics_fn(task_name: str):
+        def compute_metrics_fn(p):
+            if output_mode == "classification":
+                preds = np.argmax(p.predictions, axis=1)
+            elif output_mode == "regression":
+                preds = np.squeeze(p.predictions)
+            return glue_compute_metrics(task_name, preds, p.label_ids)
+
+        return compute_metrics_fn
+
+    # Most of these arguments are placeholders
+    # and are not really used at all, so ignore
+    # the exact values of these.
+    trainer = transformers.Trainer(
+        model=task_model,
+        args=TrainingArguments(
+            output_dir="./tmp-output",
+            per_device_train_batch_size=128,
+            per_device_eval_batch_size=128,
+            learning_rate=5e-5,
+            logging_steps=100),
+        data_collator=default_data_collator,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        compute_metrics=build_compute_metrics_fn("mnli"),
+    )
+
     task_model.cuda()
+    num_examples_tested = 0
     output_collections = []
     for test_index, test_inputs in enumerate(eval_instance_data_loader):
-        if test_index >= num_examples_to_test:
+        if num_examples_tested >= num_examples_to_test:
             break
+
+        # Skip when we only want cases of correction prediction but the
+        # prediction is incorrect, or vice versa
+        prediction_is_correct = misc_utils.is_prediction_correct(
+            trainer=trainer,
+            model=task_model,
+            inputs=test_inputs)
+
+        if mode == "only-correct" and prediction_is_correct is False:
+            continue
+
+        if mode == "only-incorrect" and prediction_is_correct is True:
+            continue
 
         for k, v in test_inputs.items():
             if isinstance(v, torch.Tensor):
@@ -99,20 +154,29 @@ def main(
                             random=True,
                             n_gpu=1,
                             device=torch.device("cuda"),
-                            damp=5e-3,
-                            scale=1e4,
+                            damp=constants.DEFAULT_INFLUENCE_HPARAMS["mnli"]["mnli"]["damp"],
+                            scale=constants.DEFAULT_INFLUENCE_HPARAMS["mnli"]["mnli"]["scale"],
                             num_samples=num_samples)
                         time_elapsed = timer.elapsed
                         print(f"{time_elapsed:.2f} seconds")
 
-                    output_collections.append({
+                    outputs = {
                         "test_index": test_index,
                         "num_samples": num_samples,
                         "batch_size": batch_size,
                         "repetition": repetition,
                         "s_test": s_test,
                         "time_elapsed": time_elapsed,
-                    })
+                        "correct": prediction_is_correct,
+                    }
+                    output_collections.append(outputs)
+                    remote_utils.save_and_mirror_scp_to_remote(
+                        object_to_save=outputs,
+                        file_name=f"stest.{mode}.{num_examples_to_test}."
+                                  f"{test_index}.{num_samples}."
+                                  f"{batch_size}.{repetition}.pth")
+
+        num_examples_tested += 1
 
     return output_collections
 
@@ -130,7 +194,7 @@ def speed_test(version: str, num_examples_to_test: int) -> Dict:
         device = torch.device("cuda")
 
     tokenizer, model = misc_utils.create_tokenizer_and_model(
-        "/export/home/Experiments/20200706/")
+        constants.MNLI_MODEL_PATH)
     train_dataset, eval_dataset = misc_utils.create_datasets(
         tokenizer=tokenizer)
     eval_instance_data_loader = misc_utils.get_dataloader(
@@ -285,6 +349,4 @@ def speed_test(version: str, num_examples_to_test: int) -> Dict:
 
 if __name__ == "__main__":
     outputs_collections = speed_test(sys.argv[1], int(sys.argv[2]))
-    torch.save(outputs_collections,
-               f"/export/home/Experiments/20200728/"
-               f"{sys.argv[1]}-{int(sys.argv[2])}")
+    torch.save(outputs_collections, f"{sys.argv[1]}-{int(sys.argv[2])}")
