@@ -3,6 +3,7 @@ import numpy as np
 from tqdm import tqdm, trange
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
+from matplotlib.axes._subplots import Subplot
 # from graph_tool.draw import graph_draw
 # from joblib import Parallel, delayed
 
@@ -567,7 +568,7 @@ def get_recall_plot(model, example, faiss_index, full_influences_dict):
 
 
 def plot_Xs_and_Ys_dict(
-        axis: np.ndarray,
+        axis: Subplot,
         Xs: List[float],
         Ys_dict: Dict[str, List[List[float]]],
         title: str,
