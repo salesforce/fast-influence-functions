@@ -3,6 +3,7 @@ import numpy as np
 from tqdm import tqdm, trange
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
+from matplotlib.axes._subplots import Subplot
 # from graph_tool.draw import graph_draw
 # from joblib import Parallel, delayed
 
@@ -564,3 +565,81 @@ def get_recall_plot(model, example, faiss_index, full_influences_dict):
         recalls_collections[name] = recalls_collection
 
     return recalls_collections
+
+
+def plot_Xs_and_Ys_dict(
+        axis: Subplot,
+        Xs: List[float],
+        Ys_dict: Dict[str, List[List[float]]],
+        title: str,
+        xlabel: str,
+        ylabel: str,
+        xscale_log: bool = True,
+        yscale_log: bool = True,
+        output_file_name: Optional[str] = None,
+) -> None:
+
+    color_map = {
+        "helpful-1": "lightskyblue",
+        "helpful-10": "deepskyblue",
+        "helpful-100": "dodgerblue",
+        "harmful-1": "lightcoral",
+        "harmful-10": "salmon",
+        "harmful-100": "red",
+        "random-1": "darkgrey",
+        "random-10": "dimgrey",
+        "random-100": "black",
+    }
+
+    for tag in Ys_dict.keys():
+        if tag not in color_map.keys():
+            raise ValueError
+
+        color = color_map[tag]
+        data = np.array(Ys_dict[tag])
+        is_random_data_point = "random" in tag
+        # `data` should be [n, m]
+        # where `n` is the number of independent trials
+        # and `m` is the number of experiments within each trial
+        if len(data.shape) != 2:
+            raise ValueError(f"`data` should be an 2d array, {data.shape}")
+
+        if data.shape[0] != 1:
+            # i.e., it has multiple trials
+            data_mean = data.mean(axis=0)
+            data_max = data.max(axis=0)
+            data_min = data.min(axis=0)
+            # data_std = data.std(axis=0)
+            axis.plot(
+                Xs,
+                data_mean,
+                color=color,
+                label=tag,
+                linestyle=("--" if is_random_data_point else None))
+
+            axis.fill_between(
+                Xs,
+                data_max,
+                data_min,
+                alpha=0.25,
+                color=color)
+        else:
+            # i.e., only one trial
+            axis.plot(
+                Xs,
+                data[0, ...],
+                color=color)
+
+    if xscale_log is True:
+        axis.set_xscale("log")
+
+    if yscale_log is True:
+        axis.set_yscale("log")
+
+    axis.set_xlabel(xlabel, fontsize=30)
+    axis.set_ylabel(ylabel, fontsize=30)
+    axis.set_title(title, fontsize=30)
+    axis.legend(fontsize=15)
+
+    if output_file_name is not None:
+        plt.savefig(output_file_name)
