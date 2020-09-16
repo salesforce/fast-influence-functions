@@ -23,8 +23,6 @@ from experiments.data_utils import (
     glue_output_modes,
     glue_compute_metrics)
 
-
-INFLUENCE_OUTPUT_BASE_DIR = "/export/share/hguo/Experiments/20200904/"
 MNLI_TRAINING_SCRIPT_NAME = "scripts/run_MNLI.20200913.sh"
 NUM_DATAPOINTS_TO_REMOVE_CHOICES = [1, 100, 10000]
 
@@ -42,7 +40,7 @@ def run_retraining_main(
                 # Load file from local or sync from remote
                 if mode == "full":
                     file_name = os.path.join(
-                        INFLUENCE_OUTPUT_BASE_DIR,
+                        constants.MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR,
                         f"KNN-recall.only-{correct_mode}.50.{example_index}"
                         f".pth.sfr-pod-nazneen-rajani")
                 influences_dict = remote_utils.load_file_from_local_or_remote(

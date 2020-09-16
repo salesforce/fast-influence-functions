@@ -29,6 +29,7 @@ MNLI_EVAL_MISMATCHED_FILE_NAME = "/export/share/hguo/Data/Glue/MNLI/dev_mismatch
 HANS_TRAIN_FILE_NAME = "/export/share/hguo/Data/HANS/heuristics_train_set.txt"
 HANS_EVAL_FILE_NAME = "/export/share/hguo/Data/HANS/heuristics_evaluation_set.txt"
 
+# Remote specific
 REMOTE_DEFAULT_SENDER_EMAIL = None
 REMOTE_DEFAULT_RECIPIENT_EMAIL = None
 REMOTE_DEFAULT_SENDER_PASSWORD = None
@@ -38,6 +39,8 @@ REMOTE_DEFAULT_SERVER_ADDRESS = "ec2-54-172-210-41.compute-1.amazonaws.com"
 REMOTE_DEFAULT_SSH_KEY_FILENAME = "./cluster/salesforce-intern-project.pem"
 REMOTE_DEFAULT_REMOTE_BASE_DIR = os.getenv("REMOTE_BASE_DIR")
 
+# Experiments specific
+MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR = "/export/share/hguo/Experiments/20200904/"
 
 # Some useful default hparams for influence functions
 DEFAULT_INFLUENCE_HPARAMS = {
