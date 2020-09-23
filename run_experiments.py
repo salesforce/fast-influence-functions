@@ -16,6 +16,7 @@ NUM_VISUALIZATION_EXPERIMENTS = 100
 
 
 def KNN_recall_experiments(
+        mode: str,
         num_experiments: Optional[int] = None
 ) -> None:
     """Experiments to Check The Influence Recall of KNN"""
@@ -26,15 +27,12 @@ def KNN_recall_experiments(
 
     # (a) when the prediction is correct, and (b) incorrect
     mnli.run_full_influence_functions(
-        mode="only-correct",
-        num_examples_to_test=num_experiments)
-
-    mnli.run_full_influence_functions(
-        mode="only-incorrect",
+        mode=mode,
         num_examples_to_test=num_experiments)
 
 
 def s_test_speed_quality_tradeoff_experiments(
+        mode: str,
         num_experiments: Optional[int] = None
 ) -> None:
     """Experiments to Check The Speed/Quality Trade-off of `s_test` estimation"""
@@ -45,11 +43,7 @@ def s_test_speed_quality_tradeoff_experiments(
 
     # (a) when the prediction is correct, and (b) incorrect
     s_test_speedup.main(
-        mode="only-correct",
-        num_examples_to_test=num_experiments)
-
-    s_test_speedup.main(
-        mode="only-incorrect",
+        mode=mode,
         num_examples_to_test=num_experiments)
 
 
@@ -124,11 +118,24 @@ if __name__ == "__main__":
     remote_utils.setup_and_verify_environment()
 
     experiment_name = sys.argv[1]
-    if experiment_name == "s-test":
-        s_test_speed_quality_tradeoff_experiments()
+    if experiment_name == "knn-recall-correct":
+        KNN_recall_experiments(
+            mode="only-correct")
+    if experiment_name == "knn-recall-incorrect":
+        KNN_recall_experiments(
+            mode="only-incorrect")
+
+    if experiment_name == "s-test-correct":
+        s_test_speed_quality_tradeoff_experiments(
+            mode="only-correct")
+    if experiment_name == "s-test-incorrect":
+        s_test_speed_quality_tradeoff_experiments(
+            mode="only-incorrect")
 
     if experiment_name == "retraining":
         MNLI_retraining_experiments()
 
     if experiment_name == "hans-augmentation":
         hans_augmentation_experiments()
+
+    raise ValueError(f"Unknown Experiment Name: {experiment_name}")
