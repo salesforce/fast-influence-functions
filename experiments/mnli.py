@@ -208,6 +208,7 @@ def run_full_influence_functions(
                 precomputed_s_test=None)
 
             outputs = {
+                "test_index": test_index,
                 "influences": influences,
                 "s_test": s_test,
                 "time": timer.elapsed,
