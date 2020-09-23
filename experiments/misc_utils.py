@@ -191,7 +191,7 @@ def is_prediction_correct(
     if preds.shape[0] != 1:
         raise ValueError("This function only works on instances.")
 
-    return (preds.argmax(axis=-1) == label_ids).all()
+    return bool((preds.argmax(axis=-1) == label_ids).all())
 
 
 def move_inputs_to_device(

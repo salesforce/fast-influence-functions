@@ -62,4 +62,5 @@ Switching gear towards downstream tasks
 * Added a few more configurations to `cluster/`
 * Added a few more constants to `experiments/constants.py`
 * Improved flexibility of the demo and visualization.
+* Fix the bug on `np.bool_(True) is True => False`
 
