@@ -237,7 +237,7 @@ def one_experiment(
                 hans_train_dataset[index]
                 for index in datapoint_indices[:num_datapoints]]
             batch = default_data_collator(datapoints)
-            new_model = pseudo_gradient_step(
+            new_model, _ = pseudo_gradient_step(
                 model=task_model,
                 inputs=batch,
                 learning_rate=learning_rate,
@@ -281,7 +281,8 @@ def pseudo_gradient_step(
         learning_rate: float,
         params_filter: List[str],
         weight_decay_ignores: List[str],
-) -> torch.nn.Module:
+        precomputed_gradients_z: Optional[List[torch.FloatTensor]] = None
+) -> Tuple[torch.nn.Module, List[torch.FloatTensor]]:
 
     params_to_freeze = [
         "bert.embeddings.",
@@ -297,14 +298,17 @@ def pseudo_gradient_step(
         "bert.encoder.layer.9.",
     ]
 
-    gradients_z = nn_influence_utils.compute_gradients(
-        n_gpu=1,
-        device=torch.device("cuda"),
-        model=model,
-        inputs=inputs,
-        params_filter=params_filter,
-        weight_decay=constants.WEIGHT_DECAY,
-        weight_decay_ignores=weight_decay_ignores)
+    if precomputed_gradients_z is not None:
+        gradients_z = precomputed_gradients_z
+    else:
+        gradients_z = nn_influence_utils.compute_gradients(
+            n_gpu=1,
+            device=torch.device("cuda"),
+            model=model,
+            inputs=inputs,
+            params_filter=params_filter,
+            weight_decay=constants.WEIGHT_DECAY,
+            weight_decay_ignores=weight_decay_ignores)
 
     new_model = deepcopy(model)
     params_to_update = [
@@ -315,7 +319,7 @@ def pseudo_gradient_step(
         [p.sub_(learning_rate * grad_z) for p, grad_z in
          zip(params_to_update, gradients_z)]
 
-    return new_model
+    return new_model, gradients_z
 
 
 def evaluate_heuristic(
