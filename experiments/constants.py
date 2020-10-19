@@ -40,7 +40,7 @@ REMOTE_DEFAULT_SSH_KEY_FILENAME = "./cluster/salesforce-intern-project.pem"
 REMOTE_DEFAULT_REMOTE_BASE_DIR = os.getenv("REMOTE_BASE_DIR")
 
 # Experiments specific
-MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR = "/export/home/hguo/Experiments/20200904/"
+MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR = "/export/home/hguo/Experiments/20200922/"
 
 # Some useful default hparams for influence functions
 DEFAULT_INFLUENCE_HPARAMS = {

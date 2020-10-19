@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import transformers
 from tqdm import tqdm
+from glob import glob
 from copy import deepcopy
 from contexttimer import Timer
 from collections import defaultdict
@@ -26,6 +27,23 @@ from experiments.data_utils import (
 MNLI_TRAINING_SCRIPT_NAME = "scripts/run_MNLI.20200913.sh"
 NUM_DATAPOINTS_TO_REMOVE_CHOICES = [1, 100, 10000]
 
+CORRECT_INDICES = sorted([
+    # e.g., `KNN-recall.only-correct.50.0.pth.g0301.ll.unc.edu`
+    int(f.split("/")[-1].split(".")[3])
+    for f in glob(os.path.join(
+        constants.MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR,
+        "*only-correct*")
+    )
+])
+INCORRECT_INDICES = sorted([
+    # e.g., `KNN-recall.only-correct.50.0.pth.g0301.ll.unc.edu`
+    int(f.split("/")[-1].split(".")[3])
+    for f in glob(os.path.join(
+        constants.MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR,
+        "*only-incorrect*")
+    )
+])
+
 
 def run_retraining_main(
         mode: str,
@@ -34,18 +52,24 @@ def run_retraining_main(
     if mode not in ["full", "KNN-1000", "KNN-10000", "random"]:
         raise ValueError(f"Unrecognized `mode` {mode}")
 
-    for example_index in range(num_examples_to_test):
+    for example_relative_index in range(num_examples_to_test):
         for correct_mode in ["correct", "incorrect"]:
+            if correct_mode == "correct":
+                example_index = CORRECT_INDICES[example_relative_index]
+            if correct_mode == "incorrect":
+                example_index = INCORRECT_INDICES[example_relative_index]
+
             if mode in ["full", "KNN-1000", "KNN-10000"]:
                 # Load file from local or sync from remote
                 if mode == "full":
+                    file_name = (
+                        f"KNN-recall.only-{correct_mode}.50.{example_index}"
+                        f".pth.g0301.ll.unc.edu")
                     file_name = os.path.join(
                         constants.MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR,
-                        f"KNN-recall.only-{correct_mode}.50.{example_index}"
-                        f".pth.sfr-pod-nazneen-rajani")
-                influences_dict = remote_utils.load_file_from_local_or_remote(
-                    local_file_name=file_name,
-                    remote_file_name=file_name)
+                        file_name)
+
+                influences_dict = torch.load(file_name)
                 helpful_indices = misc_utils.sort_dict_keys_by_vals(
                     influences_dict["influences"])
                 harmful_indices = helpful_indices[::-1]

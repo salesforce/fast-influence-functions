@@ -138,4 +138,4 @@ if __name__ == "__main__":
     if experiment_name == "hans-augmentation":
         hans_augmentation_experiments()
 
-    raise ValueError(f"Unknown Experiment Name: {experiment_name}")
+    # raise ValueError(f"Unknown Experiment Name: {experiment_name}")
