@@ -62,14 +62,21 @@ def run_retraining_main(
             if mode in ["full", "KNN-1000", "KNN-10000"]:
                 # Load file from local or sync from remote
                 if mode == "full":
-                    file_name = (
-                        f"KNN-recall.only-{correct_mode}.50.{example_index}"
-                        f".pth.g0301.ll.unc.edu")
                     file_name = os.path.join(
                         constants.MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR,
-                        file_name)
+                        f"KNN-recall.only-{correct_mode}.50.{example_index}"
+                        f".pth.g0301.ll.unc.edu")
 
                 influences_dict = torch.load(file_name)
+                if example_index != influences_dict["test_index"]:
+                    raise ValueError
+
+                if (correct_mode == "correct" and
+                        influences_dict["correct"] is not True or
+                        correct_mode == "incorrect" and
+                        influences_dict["correct"] is True):
+                    raise ValueError
+
                 helpful_indices = misc_utils.sort_dict_keys_by_vals(
                     influences_dict["influences"])
                 harmful_indices = helpful_indices[::-1]
