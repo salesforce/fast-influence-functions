@@ -18,6 +18,7 @@ from experiments import constants
 from experiments import mnli_utils
 from experiments import misc_utils
 from experiments import remote_utils
+from experiments import hans
 from influence_utils import faiss_utils
 from influence_utils import nn_influence_utils
 from experiments.data_utils import (
@@ -432,20 +433,6 @@ def compute_new_imitator_losses(
         n for n, p in imitator_model.named_parameters()
         if not p.requires_grad]
 
-    params_to_freeze = [
-        "bert.embeddings.",
-        "bert.encoder.layer.0.",
-        "bert.encoder.layer.1.",
-        "bert.encoder.layer.2.",
-        "bert.encoder.layer.3.",
-        "bert.encoder.layer.4.",
-        "bert.encoder.layer.5.",
-        "bert.encoder.layer.6.",
-        "bert.encoder.layer.7.",
-        "bert.encoder.layer.8.",
-        "bert.encoder.layer.9.",
-    ]
-
     losses = defaultdict(list)
     for index, tag in zip(tqdm(indices), tags):
         if finetune_using_ground_truth_label is True:
@@ -456,26 +443,17 @@ def compute_new_imitator_losses(
                 task_model=task_model,
                 inputs=train_inputs_collections[index])
 
-        helpful_grad_z = nn_influence_utils.compute_gradients(
-            n_gpu=1,
-            device=torch.device("cuda"),
-            model=imitator_model,
-            inputs=imitator_train_inputs,
-            params_filter=params_filter,
-            weight_decay=constants.WEIGHT_DECAY,
-            weight_decay_ignores=weight_decay_ignores)
-
         _losses = []
+        gradients_z = None
         for lr in learning_rates:
-            new_imitator_model = deepcopy(imitator_model)
-            params_to_update = [
-                p for name, p in new_imitator_model.named_parameters()
-                if not any(pfreeze in name for pfreeze in params_to_freeze)]
-
-            with torch.no_grad():
-                [p.sub_(lr * grad_z) for p, grad_z in
-                 zip(params_to_update, helpful_grad_z)]
-
+            # Re-use `gradients_z`
+            new_imitator_model, gradients_z = hans.pseudo_gradient_step(
+                model=imitator_model,
+                inputs=imitator_train_inputs,
+                learning_rate=lr,
+                params_filter=params_filter,
+                weight_decay_ignores=weight_decay_ignores,
+                precomputed_gradients_z=gradients_z)
             _, _, imitator_loss = misc_utils.predict(
                 trainer=trainer,
                 model=new_imitator_model,
