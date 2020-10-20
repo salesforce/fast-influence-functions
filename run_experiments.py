@@ -48,6 +48,7 @@ def s_test_speed_quality_tradeoff_experiments(
 
 
 def MNLI_retraining_experiments(
+        mode: str,
         num_experiments: Optional[int] = None
 ) -> None:
     print("RUNNING `MNLI_retraining_experiments`")
@@ -56,7 +57,7 @@ def MNLI_retraining_experiments(
         num_experiments = NUM_RETRAINING_EXPERIMENTS
 
     mnli.run_retraining_main(
-        mode="full",
+        mode=mode,
         num_examples_to_test=num_experiments)
 
 
@@ -132,8 +133,13 @@ if __name__ == "__main__":
         s_test_speed_quality_tradeoff_experiments(
             mode="only-incorrect")
 
-    if experiment_name == "retraining":
-        MNLI_retraining_experiments()
+    if experiment_name == "retraining-full":
+        MNLI_retraining_experiments(
+            mode="full")
+
+    if experiment_name == "retraining-random":
+        MNLI_retraining_experiments(
+            mode="random")
 
     if experiment_name == "hans-augmentation":
         hans_augmentation_experiments()
