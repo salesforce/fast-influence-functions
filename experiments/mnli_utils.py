@@ -113,11 +113,11 @@ def get_label_to_indices_map() -> Dict[str, List[int]]:
 
     return {
         "contradiction": (
-            data_frame[data_frame.gold_label == "contradiction"].index),
+            data_frame[data_frame.gold_label == "contradiction"].index).tolist(),
         "entailment": (
-            data_frame[data_frame.gold_label == "entailment"].index),
+            data_frame[data_frame.gold_label == "entailment"].index).tolist(),
         "neutral": (
-            data_frame[data_frame.gold_label == "neutral"].index),
+            data_frame[data_frame.gold_label == "neutral"].index).tolist(),
     }
 
 

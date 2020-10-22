@@ -88,6 +88,9 @@ def run_retraining_main(
             if mode == "random":
                 # Get indices corresponding to each label
                 label_to_indices = mnli_utils.get_label_to_indices_map()
+                np.random.shuffle(label_to_indices["neutral"])
+                np.random.shuffle(label_to_indices["entailment"])
+                np.random.shuffle(label_to_indices["contradiction"])
                 indices_dict = {
                     "neutral": label_to_indices["neutral"],
                     "entailment": label_to_indices["entailment"],
