@@ -1,7 +1,6 @@
 import os
 import time
 import torch
-import wandb
 import subprocess
 import numpy as np
 import matplotlib.pyplot as plt
@@ -50,9 +49,10 @@ INCORRECT_INDICES = sorted([
 def run_retraining_main(
         mode: str,
         num_examples_to_test: int,
-        init_wandb: bool = True):
+        init_wandb: bool = False):
 
     if init_wandb is True:
+        import wandb
         wandb.init(project="huggingface")
 
     if mode not in ["full", "KNN-1000", "KNN-10000", "random"]:
