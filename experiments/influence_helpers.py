@@ -12,7 +12,7 @@ def compute_influences_simplified(
         k: int,
         model: torch.nn.Module,
         inputs: Dict[str, torch.Tensor],
-        train_task_name,
+        train_task_name: str,
         trained_on_task_name: str,
         eval_task_name: str,
         train_dataset: torch.utils.data.DataLoader,
