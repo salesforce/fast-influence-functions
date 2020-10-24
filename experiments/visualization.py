@@ -20,6 +20,7 @@ from experiments.visualization_utils import (
 from experiments import constants
 from experiments import misc_utils
 from experiments import remote_utils
+from experiments import influence_helpers
 from experiments.hans_utils import HansHelper
 from transformers import Trainer, TrainingArguments
 
@@ -85,20 +86,9 @@ def main(
         task_name=eval_task_name,
         tokenizer=tokenizer)
 
-    if trained_on_task_name == "mnli-2" and train_task_name == "mnli-2":
-        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
-        faiss_index.load(constants.MNLI2_FAISS_INDEX_PATH)
-    elif trained_on_task_name == "hans" and train_task_name == "hans":
-        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
-        faiss_index.load(constants.HANS_FAISS_INDEX_PATH)
-    elif trained_on_task_name == "mnli-2" and train_task_name == "hans":
-        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
-        faiss_index.load(constants.MNLI2_HANS_FAISS_INDEX_PATH)
-    elif trained_on_task_name == "hans" and train_task_name == "mnli-2":
-        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
-        faiss_index.load(constants.HANS_MNLI2_FAISS_INDEX_PATH)
-    else:
-        faiss_index = None
+    faiss_index = influence_helpers.load_faiss_index(
+        trained_on_task_name=trained_on_task_name,
+        train_task_name=train_task_name)
 
     trainer = Trainer(
         model=model,
@@ -142,92 +132,28 @@ def main(
         if logits.argmax(axis=-1).item() != labels.item():
             wrong_input_collections.append(test_inputs)
 
-    params_filter = [
-        n for n, p in model.named_parameters()
-        if not p.requires_grad]
-
-    weight_decay_ignores = [
-        "bias",
-        "LayerNorm.weight"] + [
-        n for n, p in model.named_parameters()
-        if not p.requires_grad]
-
     # Other settings are not supported as of now
-    if trained_on_task_name == "mnli-2" and eval_task_name == "mnli-2":
-        s_test_damp = 5e-3
-        s_test_scale = 1e4
-        s_test_num_samples = 1000
-
-    if trained_on_task_name == "hans" and eval_task_name == "hans":
-        s_test_damp = 5e-3
-        s_test_scale = 1e6
-        s_test_num_samples = 2000
-
-    if trained_on_task_name == "mnli-2" and eval_task_name == "hans":
-        s_test_damp = 5e-3
-        s_test_scale = 1e6
-        s_test_num_samples = 1000
-
-    if trained_on_task_name == "hans" and eval_task_name == "mnli-2":
-        s_test_damp = 5e-3
-        s_test_scale = 1e6
-        s_test_num_samples = 2000
+    (s_test_damp,
+     s_test_scale,
+     s_test_num_samples) = influence_helpers.select_s_test_config(
+        trained_on_task_name=trained_on_task_name,
+        eval_task_name=eval_task_name)
 
     influences_collections = []
     for index, inputs in enumerate(wrong_input_collections[:num_eval_to_collect]):
         print(f"#{index}")
-        if faiss_index is not None:
-            features = misc_utils.compute_BERT_CLS_feature(model, **inputs)
-            features = features.cpu().detach().numpy()
-            KNN_distances, KNN_indices = faiss_index.search(
-                k=DEFAULT_KNN_K, queries=features)
-        else:
-            KNN_indices = None
-
-        if not use_parallel:
-            model.cuda()
-            batch_train_data_loader = misc_utils.get_dataloader(
-                train_dataset,
-                batch_size=1,
-                random=True)
-
-            instance_train_data_loader = misc_utils.get_dataloader(
-                train_dataset,
-                batch_size=1,
-                random=False)
-
-            influences, _, _ = nn_influence_utils.compute_influences(
-                n_gpu=1,
-                device=torch.device("cuda"),
-                batch_train_data_loader=batch_train_data_loader,
-                instance_train_data_loader=instance_train_data_loader,
-                model=model,
-                test_inputs=inputs,
-                params_filter=params_filter,
-                weight_decay=constants.WEIGHT_DECAY,
-                weight_decay_ignores=weight_decay_ignores,
-                s_test_damp=s_test_damp,
-                s_test_scale=s_test_scale,
-                s_test_num_samples=s_test_num_samples,
-                train_indices_to_include=KNN_indices,
-                precomputed_s_test=None)
-        else:
-            influences, _ = parallel.compute_influences_parallel(
-                # Avoid clash with main process
-                device_ids=[0, 1, 2, 3],
-                train_dataset=train_dataset,
-                batch_size=1,
-                model=model,
-                test_inputs=inputs,
-                params_filter=params_filter,
-                weight_decay=constants.WEIGHT_DECAY,
-                weight_decay_ignores=weight_decay_ignores,
-                s_test_damp=s_test_damp,
-                s_test_scale=s_test_scale,
-                s_test_num_samples=s_test_num_samples,
-                train_indices_to_include=KNN_indices,
-                return_s_test=False,
-                debug=False)
+        influences = influence_helpers.compute_influences_simplified(
+            k=DEFAULT_KNN_K,
+            faiss_index=faiss_index,
+            model=model,
+            inputs=inputs,
+            train_dataset=train_dataset,
+            use_parallel=use_parallel,
+            s_test_damp=s_test_damp,
+            s_test_scale=s_test_scale,
+            s_test_num_samples=s_test_num_samples,
+            device_ids=[0, 1, 2, 3],
+            precomputed_s_test=None)
 
         influences_collections.append(influences)
 
