@@ -8,9 +8,6 @@ from matplotlib.axes._subplots import Subplot
 # from joblib import Parallel, delayed
 
 from typing import List, Dict, Tuple, Optional, Union, Callable
-from influence_utils import faiss_utils
-from influence_utils import parallel
-from influence_utils import nn_influence_utils
 from experiments.visualization_utils import (
     get_circle_coordinates,
     get_within_circle_constraint,
@@ -49,6 +46,7 @@ def main(
     eval_task_name: str,
     num_eval_to_collect: int,
     use_parallel: bool = True,
+    kNN_k: Optional[int] = None,
     hans_heuristic: Optional[str] = None,
     trained_on_task_name: Optional[str] = None,
 ) -> List[Dict[int, float]]:
@@ -77,6 +75,9 @@ def main(
     if trained_on_task_name in ["hans"]:
         tokenizer, model = misc_utils.create_tokenizer_and_model(
             constants.HANS_MODEL_PATH)
+
+    if kNN_k is None:
+        kNN_k = DEFAULT_KNN_K
 
     train_dataset, _ = misc_utils.create_datasets(
         task_name=train_task_name,
@@ -143,7 +144,7 @@ def main(
     for index, inputs in enumerate(wrong_input_collections[:num_eval_to_collect]):
         print(f"#{index}")
         influences = influence_helpers.compute_influences_simplified(
-            k=DEFAULT_KNN_K,
+            k=kNN_k,
             faiss_index=faiss_index,
             model=model,
             inputs=inputs,
