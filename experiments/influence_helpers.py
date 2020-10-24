@@ -18,7 +18,7 @@ def compute_influences_simplified(
         use_parallel: bool,
         device_ids: Optional[List[int]] = None,
         precomputed_s_test: Optional[List[torch.FloatTensor]] = None,
-) -> Tuple[Dict[int, float], List[torch.FloatTensor]]:
+) -> Tuple[Dict[int, float]]:
 
     faiss_index = faiss_utils.FAISSIndex(768, "Flat")
     faiss_index.load(constants.MNLI_FAISS_INDEX_PATH)
