@@ -12,6 +12,7 @@ def compute_influences_simplified(
         k: int,
         model: torch.nn.Module,
         inputs: Dict[str, torch.Tensor],
+        train_task_name,
         trained_on_task_name: str,
         eval_task_name: str,
         train_dataset: torch.utils.data.DataLoader,
@@ -20,9 +21,36 @@ def compute_influences_simplified(
         precomputed_s_test: Optional[List[torch.FloatTensor]] = None,
 ) -> Tuple[Dict[int, float]]:
 
-    faiss_index = faiss_utils.FAISSIndex(768, "Flat")
-    faiss_index.load(constants.MNLI_FAISS_INDEX_PATH)
-    print(f"Loaded FAISS index with {len(faiss_index)} entries")
+    if train_task_name not in ["mnli-2", "hans"]:
+        raise ValueError
+
+    if eval_task_name not in ["mnli-2", "hans"]:
+        raise ValueError
+
+    if trained_on_task_name is None:
+        # The task the model was trained on
+        # can be different from `train_task_name`
+        # which is used to determine on which the
+        # influence values will be computed.
+        trained_on_task_name = train_task_name
+
+    if trained_on_task_name not in ["mnli-2", "hans"]:
+        raise ValueError
+
+    if trained_on_task_name == "mnli-2" and train_task_name == "mnli-2":
+        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
+        faiss_index.load(constants.MNLI2_FAISS_INDEX_PATH)
+    elif trained_on_task_name == "hans" and train_task_name == "hans":
+        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
+        faiss_index.load(constants.HANS_FAISS_INDEX_PATH)
+    elif trained_on_task_name == "mnli-2" and train_task_name == "hans":
+        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
+        faiss_index.load(constants.MNLI2_HANS_FAISS_INDEX_PATH)
+    elif trained_on_task_name == "hans" and train_task_name == "mnli-2":
+        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
+        faiss_index.load(constants.HANS_MNLI2_FAISS_INDEX_PATH)
+    else:
+        faiss_index = None
 
     # Make sure indices are sorted according to distances
     # KNN_distances[(
