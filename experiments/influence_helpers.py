@@ -8,8 +8,67 @@ from influence_utils import parallel
 from influence_utils import nn_influence_utils
 
 
+def load_faiss_index_simplified(
+        trained_on_task_name: str,
+        train_task_name: str,
+) -> faiss_utils.FAISSIndex:
+
+    if trained_on_task_name == "mnli-2" and train_task_name == "mnli-2":
+        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
+        faiss_index.load(constants.MNLI2_FAISS_INDEX_PATH)
+    elif trained_on_task_name == "hans" and train_task_name == "hans":
+        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
+        faiss_index.load(constants.HANS_FAISS_INDEX_PATH)
+    elif trained_on_task_name == "mnli-2" and train_task_name == "hans":
+        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
+        faiss_index.load(constants.MNLI2_HANS_FAISS_INDEX_PATH)
+    elif trained_on_task_name == "hans" and train_task_name == "mnli-2":
+        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
+        faiss_index.load(constants.HANS_MNLI2_FAISS_INDEX_PATH)
+    else:
+        faiss_index = None
+
+    return faiss_index
+
+
+def select_s_test_config(
+    trained_on_task_name: str,
+    eval_task_name: str,
+) -> Tuple[float, float, int]:
+
+    # Other settings are not supported as of now
+    if trained_on_task_name == "mnli-2" and eval_task_name == "mnli-2":
+        s_test_damp = 5e-3
+        s_test_scale = 1e4
+        s_test_num_samples = 1000
+
+    elif trained_on_task_name == "hans" and eval_task_name == "hans":
+        s_test_damp = 5e-3
+        s_test_scale = 1e6
+        s_test_num_samples = 2000
+
+    elif trained_on_task_name == "mnli-2" and eval_task_name == "hans":
+        s_test_damp = 5e-3
+        s_test_scale = 1e6
+        s_test_num_samples = 1000
+
+    elif trained_on_task_name == "hans" and eval_task_name == "mnli-2":
+        s_test_damp = 5e-3
+        s_test_scale = 1e6
+        s_test_num_samples = 2000
+
+    else:
+        raise ValueError
+
+    return s_test_damp, s_test_scale, s_test_num_samples
+
+
 def compute_influences_simplified(
         k: int,
+        faiss_index,
+        s_test_damp,
+        s_test_scale,
+        s_test_num_samples,
         model: torch.nn.Module,
         inputs: Dict[str, torch.Tensor],
         train_task_name: str,
@@ -37,21 +96,6 @@ def compute_influences_simplified(
     if trained_on_task_name not in ["mnli-2", "hans"]:
         raise ValueError
 
-    if trained_on_task_name == "mnli-2" and train_task_name == "mnli-2":
-        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
-        faiss_index.load(constants.MNLI2_FAISS_INDEX_PATH)
-    elif trained_on_task_name == "hans" and train_task_name == "hans":
-        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
-        faiss_index.load(constants.HANS_FAISS_INDEX_PATH)
-    elif trained_on_task_name == "mnli-2" and train_task_name == "hans":
-        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
-        faiss_index.load(constants.MNLI2_HANS_FAISS_INDEX_PATH)
-    elif trained_on_task_name == "hans" and train_task_name == "mnli-2":
-        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
-        faiss_index.load(constants.HANS_MNLI2_FAISS_INDEX_PATH)
-    else:
-        faiss_index = None
-
     # Make sure indices are sorted according to distances
     # KNN_distances[(
     #     KNN_indices.squeeze(axis=0)[
@@ -67,27 +111,6 @@ def compute_influences_simplified(
         "LayerNorm.weight"] + [
         n for n, p in model.named_parameters()
         if not p.requires_grad]
-
-    # Other settings are not supported as of now
-    if trained_on_task_name == "mnli-2" and eval_task_name == "mnli-2":
-        s_test_damp = 5e-3
-        s_test_scale = 1e4
-        s_test_num_samples = 1000
-
-    if trained_on_task_name == "hans" and eval_task_name == "hans":
-        s_test_damp = 5e-3
-        s_test_scale = 1e6
-        s_test_num_samples = 2000
-
-    if trained_on_task_name == "mnli-2" and eval_task_name == "hans":
-        s_test_damp = 5e-3
-        s_test_scale = 1e6
-        s_test_num_samples = 1000
-
-    if trained_on_task_name == "hans" and eval_task_name == "mnli-2":
-        s_test_damp = 5e-3
-        s_test_scale = 1e6
-        s_test_num_samples = 2000
 
     if faiss_index is not None:
         features = misc_utils.compute_BERT_CLS_feature(model, **inputs)
