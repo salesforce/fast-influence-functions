@@ -8,10 +8,16 @@ from influence_utils import parallel
 from influence_utils import nn_influence_utils
 
 
-def load_faiss_index_simplified(
+def load_faiss_index(
         trained_on_task_name: str,
         train_task_name: str,
 ) -> faiss_utils.FAISSIndex:
+
+    if trained_on_task_name not in ["mnli-2", "hans"]:
+        raise ValueError
+
+    if train_task_name not in ["mnli-2", "hans"]:
+        raise ValueError
 
     if trained_on_task_name == "mnli-2" and train_task_name == "mnli-2":
         faiss_index = faiss_utils.FAISSIndex(768, "Flat")
@@ -35,6 +41,12 @@ def select_s_test_config(
     trained_on_task_name: str,
     eval_task_name: str,
 ) -> Tuple[float, float, int]:
+
+    if trained_on_task_name not in ["mnli-2", "hans"]:
+        raise ValueError
+
+    if eval_task_name not in ["mnli-2", "hans"]:
+        raise ValueError
 
     # Other settings are not supported as of now
     if trained_on_task_name == "mnli-2" and eval_task_name == "mnli-2":
@@ -65,36 +77,17 @@ def select_s_test_config(
 
 def compute_influences_simplified(
         k: int,
-        faiss_index,
-        s_test_damp,
-        s_test_scale,
-        s_test_num_samples,
+        faiss_index: faiss_utils.FAISSIndex,
         model: torch.nn.Module,
         inputs: Dict[str, torch.Tensor],
-        train_task_name: str,
-        trained_on_task_name: str,
-        eval_task_name: str,
         train_dataset: torch.utils.data.DataLoader,
         use_parallel: bool,
+        s_test_damp: float,
+        s_test_scale: float,
+        s_test_num_samples: int,
         device_ids: Optional[List[int]] = None,
         precomputed_s_test: Optional[List[torch.FloatTensor]] = None,
 ) -> Tuple[Dict[int, float]]:
-
-    if train_task_name not in ["mnli-2", "hans"]:
-        raise ValueError
-
-    if eval_task_name not in ["mnli-2", "hans"]:
-        raise ValueError
-
-    if trained_on_task_name is None:
-        # The task the model was trained on
-        # can be different from `train_task_name`
-        # which is used to determine on which the
-        # influence values will be computed.
-        trained_on_task_name = train_task_name
-
-    if trained_on_task_name not in ["mnli-2", "hans"]:
-        raise ValueError
 
     # Make sure indices are sorted according to distances
     # KNN_distances[(
@@ -148,9 +141,12 @@ def compute_influences_simplified(
             train_indices_to_include=KNN_indices,
             precomputed_s_test=None)
     else:
+        if device_ids is None:
+            raise ValueError("`device_ids` cannot be None")
+
         influences, _ = parallel.compute_influences_parallel(
             # Avoid clash with main process
-            device_ids=[0, 1, 2, 3],
+            device_ids=device_ids,
             train_dataset=train_dataset,
             batch_size=1,
             model=model,
