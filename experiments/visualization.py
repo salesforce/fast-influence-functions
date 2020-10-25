@@ -50,7 +50,7 @@ def main(
     kNN_k: Optional[int] = None,
     hans_heuristic: Optional[str] = None,
     trained_on_task_name: Optional[str] = None,
-) -> List[Dict[int, float]]:
+) -> List[Dict[str, Union[int, Dict[int, float]]]]:
 
     if train_task_name not in ["mnli-2", "hans"]:
         raise ValueError
@@ -130,15 +130,15 @@ def main(
     # Data-points where the model got wrong
     correct_input_collections = []
     incorrect_input_collections = []
-    for i, test_inputs in enumerate(eval_instance_data_loader):
+    for index, test_inputs in enumerate(eval_instance_data_loader):
         logits, labels, step_eval_loss = misc_utils.predict(
             trainer=trainer,
             model=model,
             inputs=test_inputs)
         if logits.argmax(axis=-1).item() != labels.item():
-            incorrect_input_collections.append(test_inputs)
+            incorrect_input_collections.append((index, test_inputs))
         else:
-            correct_input_collections.append(test_inputs)
+            correct_input_collections.append((index, test_inputs))
 
     if mode == "only-incorrect":
         input_collections = incorrect_input_collections
@@ -153,7 +153,7 @@ def main(
         eval_task_name=eval_task_name)
 
     influences_collections = []
-    for index, inputs in enumerate(input_collections[:num_eval_to_collect]):
+    for index, inputs in input_collections[:num_eval_to_collect]:
         print(f"#{index}")
         influences = influence_helpers.compute_influences_simplified(
             k=kNN_k,
@@ -168,7 +168,10 @@ def main(
             device_ids=[0, 1, 2, 3],
             precomputed_s_test=None)
 
-        influences_collections.append(influences)
+        influences_collections.append({
+            "index": index,
+            "influences": influences,
+        })
 
     remote_utils.save_and_mirror_scp_to_remote(
         object_to_save=influences_collections,
@@ -184,11 +187,13 @@ def main(
 def run_experiments(option: str) -> List[List[Dict[int, float]]]:
     if option == "mnli2_and_hans":
         mnli2_influences = main(
+            mode="only-incorrect",
             train_task_name="mnli-2",
             eval_task_name="mnli-2",
             num_eval_to_collect=100)
 
         hans_influences = main(
+            mode="only-incorrect",
             train_task_name="mnli-2",
             eval_task_name="hans",
             num_eval_to_collect=100)
@@ -199,6 +204,7 @@ def run_experiments(option: str) -> List[List[Dict[int, float]]]:
         hans_influences_collections = []
         for hans_heuristic in ["lexical_overlap", "subsequence", "constituent"]:
             hans_influences = main(
+                mode="only-incorrect",
                 train_task_name="mnli-2",
                 eval_task_name="hans",
                 num_eval_to_collect=100,
@@ -212,6 +218,7 @@ def run_experiments(option: str) -> List[List[Dict[int, float]]]:
         hans_influences_collections = []
         for hans_heuristic in ["lexical_overlap", "subsequence", "constituent"]:
             hans_influences = main(
+                mode="only-incorrect",
                 train_task_name="hans",
                 eval_task_name="hans",
                 num_eval_to_collect=100,
