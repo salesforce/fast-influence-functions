@@ -42,6 +42,7 @@ DEFAULT_TRAIN_VERTEX_SIZE = 3
 
 
 def main(
+    mode: str,
     train_task_name: str,
     eval_task_name: str,
     num_eval_to_collect: int,
@@ -67,6 +68,12 @@ def main(
     if trained_on_task_name not in ["mnli-2", "hans"]:
         raise ValueError
 
+    if mode not in ["only-correct", "only-incorrect"]:
+        raise ValueError(f"Unrecognized mode {mode}")
+
+    if kNN_k is None:
+        kNN_k = DEFAULT_KNN_K
+
     # `trained_on_task_name` determines the model to load
     if trained_on_task_name in ["mnli-2"]:
         tokenizer, model = misc_utils.create_tokenizer_and_model(
@@ -75,9 +82,6 @@ def main(
     if trained_on_task_name in ["hans"]:
         tokenizer, model = misc_utils.create_tokenizer_and_model(
             constants.HANS_MODEL_PATH)
-
-    if kNN_k is None:
-        kNN_k = DEFAULT_KNN_K
 
     train_dataset, _ = misc_utils.create_datasets(
         task_name=train_task_name,
@@ -124,14 +128,22 @@ def main(
             random=False)
 
     # Data-points where the model got wrong
-    wrong_input_collections = []
+    correct_input_collections = []
+    incorrect_input_collections = []
     for i, test_inputs in enumerate(eval_instance_data_loader):
         logits, labels, step_eval_loss = misc_utils.predict(
             trainer=trainer,
             model=model,
             inputs=test_inputs)
         if logits.argmax(axis=-1).item() != labels.item():
-            wrong_input_collections.append(test_inputs)
+            incorrect_input_collections.append(test_inputs)
+        else:
+            correct_input_collections.append(test_inputs)
+
+    if mode == "only-incorrect":
+        input_collections = incorrect_input_collections
+    else:
+        input_collections = correct_input_collections
 
     # Other settings are not supported as of now
     (s_test_damp,
@@ -141,7 +153,7 @@ def main(
         eval_task_name=eval_task_name)
 
     influences_collections = []
-    for index, inputs in enumerate(wrong_input_collections[:num_eval_to_collect]):
+    for index, inputs in enumerate(input_collections[:num_eval_to_collect]):
         print(f"#{index}")
         influences = influence_helpers.compute_influences_simplified(
             k=kNN_k,
