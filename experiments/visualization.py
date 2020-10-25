@@ -179,7 +179,7 @@ def main(
             f"visualization.{num_eval_to_collect}"
             f".{train_task_name}-{eval_task_name}"
             f"-{hans_heuristic}-{trained_on_task_name}"
-            f".{use_parallel}.pth"))
+            f".{kNN_k}.{use_parallel}.pth"))
 
     return influences_collections
 
