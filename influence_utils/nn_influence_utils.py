@@ -16,21 +16,6 @@ def convert_ids_to_string(
     return tokenizer.convert_tokens_to_string(tokens)
 
 
-def experimental_clip_gradient_norm_(
-        gradients: List[torch.Tensor],
-        max_norm: Optional[float] = 1.0) -> None:
-
-    if max_norm is None:
-        return gradients
-
-    total_norm = torch.norm(torch.stack(
-        [torch.norm(grad, 2) for grad in gradients]), 2)
-    clip_coef = max_norm / (total_norm + 1e-6)
-
-    for grad in gradients:
-        grad.detach().mul_(clip_coef)
-
-
 def get_loss_with_weight_decay(
         device: torch.device,
         n_gpu: int,
