@@ -64,13 +64,12 @@ def run_retraining_main(
             if correct_mode == "incorrect":
                 example_index = INCORRECT_INDICES[example_relative_index]
 
-            if mode in ["full", "KNN-1000", "KNN-10000"]:
+            if mode in ["full"]:
                 # Load file from local or sync from remote
-                if mode == "full":
-                    file_name = os.path.join(
-                        constants.MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR,
-                        f"KNN-recall.only-{correct_mode}.50.{example_index}"
-                        f".pth.g0301.ll.unc.edu")
+                file_name = os.path.join(
+                    constants.MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR,
+                    f"KNN-recall.only-{correct_mode}.50.{example_index}"
+                    f".pth.g0301.ll.unc.edu")
 
                 influences_dict = torch.load(file_name)
                 if example_index != influences_dict["test_index"]:
@@ -80,6 +79,30 @@ def run_retraining_main(
                         influences_dict["correct"] is not True or
                         correct_mode == "incorrect" and
                         influences_dict["correct"] is True):
+                    raise ValueError
+
+                helpful_indices = misc_utils.sort_dict_keys_by_vals(
+                    influences_dict["influences"])
+                harmful_indices = helpful_indices[::-1]
+                indices_dict = {
+                    "helpful": helpful_indices,
+                    "harmful": harmful_indices}
+
+            if mode in ["KNN-1000", "KNN-10000"]:
+                if mode == "KNN-1000":
+                    kNN_k = 1000
+                if mode == "KNN-10000":
+                    kNN_k = 10000
+
+                file_name = os.path.join(
+                    constants.MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR2,
+                    f"visualization"
+                    f".only-{correct_mode}.5"
+                    f".mnli-2-mnli-2-None-mnli-2"
+                    f".{kNN_k}.True.pth.g0306.ll.unc.edu")
+
+                influences_dict = torch.load(file_name)[example_relative_index]
+                if example_index != influences_dict["test_index"]:
                     raise ValueError
 
                 helpful_indices = misc_utils.sort_dict_keys_by_vals(

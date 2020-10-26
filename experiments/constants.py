@@ -41,6 +41,7 @@ REMOTE_DEFAULT_REMOTE_BASE_DIR = os.getenv("REMOTE_BASE_DIR")
 
 # Experiments specific
 MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR = "/export/home/hguo/Experiments/20200922/"
+MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR2 = "/export/home/hguo/Experiments/20201019/visualization_outputs/"
 
 # Some useful default hparams for influence functions
 DEFAULT_INFLUENCE_HPARAMS = {
