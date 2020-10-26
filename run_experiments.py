@@ -141,6 +141,14 @@ if __name__ == "__main__":
         MNLI_retraining_experiments(
             mode="random")
 
+    if experiment_name == "retraining-KNN-1000":
+        MNLI_retraining_experiments(
+            mode="KNN-1000")
+
+    if experiment_name == "retraining-KNN-10000":
+        MNLI_retraining_experiments(
+            mode="KNN-10000")
+
     if experiment_name == "hans-augmentation":
         hans_augmentation_experiments()
 
