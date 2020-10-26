@@ -52,10 +52,10 @@ def main(
     trained_on_task_name: Optional[str] = None,
 ) -> List[Dict[str, Union[int, Dict[int, float]]]]:
 
-    if train_task_name not in ["mnli-2", "hans"]:
+    if train_task_name not in ["mnli", "mnli-2", "hans"]:
         raise ValueError
 
-    if eval_task_name not in ["mnli-2", "hans"]:
+    if eval_task_name not in ["mnli", "mnli-2", "hans"]:
         raise ValueError
 
     if trained_on_task_name is None:
@@ -65,7 +65,7 @@ def main(
         # influence values will be computed.
         trained_on_task_name = train_task_name
 
-    if trained_on_task_name not in ["mnli-2", "hans"]:
+    if trained_on_task_name not in ["mnli", "mnli-2", "hans"]:
         raise ValueError
 
     if mode not in ["only-correct", "only-incorrect"]:
@@ -75,6 +75,10 @@ def main(
         kNN_k = DEFAULT_KNN_K
 
     # `trained_on_task_name` determines the model to load
+    if trained_on_task_name in ["mnli"]:
+        tokenizer, model = misc_utils.create_tokenizer_and_model(
+            constants.MNLI_MODEL_PATH)
+
     if trained_on_task_name in ["mnli-2"]:
         tokenizer, model = misc_utils.create_tokenizer_and_model(
             constants.MNLI2_MODEL_PATH)
@@ -107,7 +111,7 @@ def main(
         eval_dataset=eval_dataset,
     )
 
-    if eval_task_name in ["mnli-2"]:
+    if eval_task_name in ["mnli", "mnli-2"]:
         eval_instance_data_loader = misc_utils.get_dataloader(
             dataset=eval_dataset,
             batch_size=1,

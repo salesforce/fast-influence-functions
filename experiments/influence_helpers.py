@@ -13,13 +13,16 @@ def load_faiss_index(
         train_task_name: str,
 ) -> faiss_utils.FAISSIndex:
 
-    if trained_on_task_name not in ["mnli-2", "hans"]:
+    if trained_on_task_name not in ["mnli", "mnli-2", "hans"]:
         raise ValueError
 
-    if train_task_name not in ["mnli-2", "hans"]:
+    if train_task_name not in ["mnli", "mnli-2", "hans"]:
         raise ValueError
 
-    if trained_on_task_name == "mnli-2" and train_task_name == "mnli-2":
+    if trained_on_task_name == "mnli" and train_task_name == "mnli":
+        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
+        faiss_index.load(constants.MNLI_FAISS_INDEX_PATH)
+    elif trained_on_task_name == "mnli-2" and train_task_name == "mnli-2":
         faiss_index = faiss_utils.FAISSIndex(768, "Flat")
         faiss_index.load(constants.MNLI2_FAISS_INDEX_PATH)
     elif trained_on_task_name == "hans" and train_task_name == "hans":
@@ -42,14 +45,19 @@ def select_s_test_config(
     eval_task_name: str,
 ) -> Tuple[float, float, int]:
 
-    if trained_on_task_name not in ["mnli-2", "hans"]:
+    if trained_on_task_name not in ["mnli", "mnli-2", "hans"]:
         raise ValueError
 
-    if eval_task_name not in ["mnli-2", "hans"]:
+    if eval_task_name not in ["mnli", "mnli-2", "hans"]:
         raise ValueError
 
     # Other settings are not supported as of now
-    if trained_on_task_name == "mnli-2" and eval_task_name == "mnli-2":
+    if trained_on_task_name == "mnli" and eval_task_name == "mnli":
+        s_test_damp = 5e-3
+        s_test_scale = 1e4
+        s_test_num_samples = 1000
+
+    elif trained_on_task_name == "mnli-2" and eval_task_name == "mnli-2":
         s_test_damp = 5e-3
         s_test_scale = 1e4
         s_test_num_samples = 1000
