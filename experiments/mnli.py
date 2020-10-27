@@ -97,7 +97,7 @@ def run_retraining_main(
                     f".{kNN_k}.True.pth.g0306.ll.unc.edu")
 
                 influences_dict = torch.load(file_name)[example_relative_index]
-                if example_index != influences_dict["test_index"]:
+                if example_index != influences_dict["index"]:
                     raise ValueError
 
                 helpful_indices = misc_utils.sort_dict_keys_by_vals(
