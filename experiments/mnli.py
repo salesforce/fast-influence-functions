@@ -92,8 +92,8 @@ def run_retraining_main(
                 file_name = os.path.join(
                     constants.MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR2,
                     f"visualization"
-                    f".only-{correct_mode}.5"
-                    f".mnli-2-mnli-2-None-mnli-2"
+                    f".only-{correct_mode}"
+                    f".5.mnli-mnli-None-mnli"
                     f".{kNN_k}.True.pth.g0306.ll.unc.edu")
 
                 influences_dict = torch.load(file_name)[example_relative_index]
