@@ -315,6 +315,10 @@ def pseudo_gradient_step(
         p for name, p in new_model.named_parameters()
         if not any(pfreeze in name for pfreeze in params_to_freeze)]
 
+    # They should refer to the same parameters
+    if len(params_to_update) != len(gradients_z):
+        raise ValueError
+
     with torch.no_grad():
         [p.sub_(learning_rate * grad_z) for p, grad_z in
          zip(params_to_update, gradients_z)]
