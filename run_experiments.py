@@ -13,6 +13,7 @@ NUM_KNN_RECALL_EXPERIMENTS = 50
 NUM_RETRAINING_EXPERIMENTS = 3
 NUM_STEST_EXPERIMENTS = 10
 NUM_VISUALIZATION_EXPERIMENTS = 100
+NUM_IMITATOR_EXPERIMENTS = 10
 
 
 def KNN_recall_experiments(
@@ -91,6 +92,7 @@ def visualization_experiments(
 def hans_augmentation_experiments(
         num_replicas: Optional[int] = None
 ) -> None:
+    print("RUNNING `hans_augmentation_experiments`")
     # We will use the all the `train_heuristic` here, as we did in
     # `eval_heuristics`. So looping over the `DEFAULT_EVAL_HEURISTICS`
     for train_heuristic in hans.DEFAULT_EVAL_HEURISTICS:
@@ -98,6 +100,23 @@ def hans_augmentation_experiments(
             train_heuristic=train_heuristic,
             num_replicas=num_replicas,
             use_parallel=USE_PARALLEL)
+
+
+def imitator_experiments(
+        num_experiments: Optional[int] = None
+) -> None:
+    print("RUNNING `imitator_experiments`")
+
+    if num_experiments is None:
+        num_experiments = NUM_IMITATOR_EXPERIMENTS
+
+    mnli.imitator_main(
+        mode="only-correct",
+        num_examples_to_test=num_experiments)
+
+    mnli.imitator_main(
+        mode="only-incorrect",
+        num_examples_to_test=num_experiments)
 
 
 # ------------------------------------------------------------------
@@ -151,5 +170,8 @@ if __name__ == "__main__":
 
     if experiment_name == "hans-augmentation":
         hans_augmentation_experiments()
+
+    if experiment_name == "imitator":
+        imitator_experiments()
 
     # raise ValueError(f"Unknown Experiment Name: {experiment_name}")
