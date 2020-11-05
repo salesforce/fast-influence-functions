@@ -376,7 +376,7 @@ def run_one_imitator_experiment(
     finetune_using_ground_truth_label: bool = False
 ) -> Dict[str, Any]:
 
-    imitator_test_inputs = experimental_make_imitator_inputs(
+    imitator_test_inputs = _make_imitator_inputs(
         trainer=trainer, task_model=task_model, inputs=test_inputs)
     # if labels[0] != logits.argmax(axis=1)[0]:
     #     break
@@ -470,7 +470,7 @@ def compute_new_imitator_losses(
         if finetune_using_ground_truth_label is True:
             imitator_train_inputs = train_inputs_collections[index]
         else:
-            imitator_train_inputs = experimental_make_imitator_inputs(
+            imitator_train_inputs = _make_imitator_inputs(
                 trainer=trainer,
                 task_model=task_model,
                 inputs=train_inputs_collections[index])
@@ -497,7 +497,7 @@ def compute_new_imitator_losses(
     return losses
 
 
-def experimental_make_imitator_inputs(
+def _make_imitator_inputs(
         trainer: transformers.Trainer,
         task_model: torch.nn.Module,
         inputs: Dict[str, torch.Tensor],
