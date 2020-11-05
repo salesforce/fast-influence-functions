@@ -7,6 +7,7 @@ WEIGHT_DECAY = 0.005
 MNLI_MODEL_PATH = "/export/home/hguo/Experiments/20200706/"
 HANS_MODEL_PATH = "/export/home/hguo/Experiments/20200907/"
 MNLI2_MODEL_PATH = "/export/home/hguo/Experiments/20200801/"
+MNLI_IMITATOR_MODEL_PATH = "/export/home/hguo/Experiments/20200718/output_dir/"
 
 # Trained and used in MNLI
 MNLI_FAISS_INDEX_PATH = "/export/home/hguo/Experiments/20200713/MNLI.index"
