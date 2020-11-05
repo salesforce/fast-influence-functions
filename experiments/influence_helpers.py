@@ -147,7 +147,7 @@ def compute_influences_simplified(
             s_test_scale=s_test_scale,
             s_test_num_samples=s_test_num_samples,
             train_indices_to_include=KNN_indices,
-            precomputed_s_test=None)
+            precomputed_s_test=precomputed_s_test)
     else:
         if device_ids is None:
             raise ValueError("`device_ids` cannot be None")
