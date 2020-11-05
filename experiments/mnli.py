@@ -283,7 +283,7 @@ def run_full_influence_functions(
     return outputs_collections
 
 
-def imitator_main(mode: str, num_examples_to_test: int):
+def imitator_main(mode: str, num_examples_to_test: int) -> List[Dict[str, Any]]:
     if mode not in ["only-correct", "only-incorrect"]:
         raise ValueError(f"Unrecognized mode {mode}")
 
@@ -295,6 +295,7 @@ def imitator_main(mode: str, num_examples_to_test: int):
 
     (mnli_train_dataset,
      mnli_eval_dataset) = misc_utils.create_datasets(
+        task_name="mnli",
         tokenizer=task_tokenizer)
 
     task_model.cuda()
@@ -354,6 +355,10 @@ def imitator_main(mode: str, num_examples_to_test: int):
         end_time = time.time()
         print(f"#{len(outputs_collections)}/{len(outputs_collections)}: "
               f"Elapsed {(end_time - start_time) / 60:.2f}")
+
+    torch.save(
+        outputs_collections,
+        f"imiator_experiments.{mode}.{num_examples_to_test}.pt")
 
     return outputs_collections
 
