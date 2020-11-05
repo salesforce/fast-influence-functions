@@ -18,6 +18,7 @@ from experiments import constants
 from experiments import mnli_utils
 from experiments import misc_utils
 from experiments import remote_utils
+from experiments import influence_helpers
 from experiments import hans
 from influence_utils import nn_influence_utils
 from experiments.data_utils import (
@@ -282,119 +283,73 @@ def run_full_influence_functions(
     return outputs_collections
 
 
+def imitator_main(mode: str, num_examples_to_test: int):
+    if mode not in ["only-correct", "only-incorrect"]:
+        raise ValueError(f"Unrecognized mode {mode}")
 
+    task_tokenizer, task_model = misc_utils.create_tokenizer_and_model(
+        constants.MNLI_MODEL_PATH)
 
+    imitator_tokenizer, imitator_model = misc_utils.create_tokenizer_and_model(
+        constants.MNLI_IMITATOR_MODEL_PATH)
 
+    (mnli_train_dataset,
+     mnli_eval_dataset) = misc_utils.create_datasets(
+        tokenizer=task_tokenizer)
 
+    task_model.cuda()
+    imitator_model.cuda()
+    if task_model.training is True or imitator_model.training is True:
+        raise ValueError("One of the model is in training mode")
+    print(task_model.device, imitator_model.device)
 
+    # Most of these arguments are placeholders
+    # and are not really used at all, so ignore
+    # the exact values of these.
+    trainer = transformers.Trainer(
+        model=task_model,
+        args=TrainingArguments(
+            output_dir="./tmp-output",
+            per_device_train_batch_size=128,
+            per_device_eval_batch_size=128,
+            learning_rate=5e-5,
+            logging_steps=100),
+    )
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def main(
-    label_list: List[str],
-    task_model: torch.nn.Module,
-    imitator_model: torch.nn.Module,
-    trainer: transformers.Trainer,
-    test_data_point_indices: List[int],
-    batch_train_data_loader: torch.utils.data.DataLoader,
-    instance_train_data_loader: torch.utils.data.DataLoader,
-    instance_eval_data_loader: torch.utils.data.DataLoader,
-    sample_size: int = 10,
-    num_nearest_neighbors: int = 10000,
-    finetune_using_ground_truth_label: bool = False
-) -> List[Dict[str, Any]]:
+    eval_instance_data_loader = misc_utils.get_dataloader(
+        mnli_eval_dataset,
+        batch_size=1,
+        data_collator=default_data_collator)
 
     train_inputs_collections = torch.load(
         constants.MNLI_TRAIN_INPUT_COLLECTIONS_PATH)
 
-    neutral_examples = []
-    entailment_examples = []
-    contradiction_examples = []
+    inputs_by_label: Dict[str, List[int]] = defaultdict(list)
     for i in range(len(train_inputs_collections)):
-        label = label_list[train_inputs_collections[i]["labels"]]
-        if label == "neutral":
-            neutral_examples.append(i)
-        if label == "entailment":
-            entailment_examples.append(i)
-        if label == "contradiction":
-            contradiction_examples.append(i)
+        label = mnli_train_dataset.label_list[
+            train_inputs_collections[i]["labels"]]
+        inputs_by_label[label].append(i)
 
     outputs_collections = []
-    for i, test_inputs in enumerate(instance_eval_data_loader):
-        if i not in test_data_point_indices:
+    for i, test_inputs in enumerate(eval_instance_data_loader):
+        if mode == "only-correct" and i not in CORRECT_INDICES[:num_examples_to_test]:
+            continue
+        if mode == "only-incorrect" and i not in INCORRECT_INDICES[:num_examples_to_test]:
             continue
 
         start_time = time.time()
-        imitator_test_inputs = experimental_make_imitator_inputs(
-            trainer=trainer, task_model=task_model, inputs=test_inputs)
-        # if labels[0] != logits.argmax(axis=1)[0]:
-        #     break
-        influences, _ = get_influences(
-            k=num_nearest_neighbors,
-            model=task_model,
-            test_inputs=test_inputs,
-            batch_train_data_loader=batch_train_data_loader,
-            instance_train_data_loader=instance_train_data_loader)
-
-        data_indices = (
-            np.random.choice(neutral_examples,
-                             size=sample_size,
-                             replace=False).tolist() +  # noqa
-            np.random.choice(entailment_examples,
-                             size=sample_size,
-                             replace=False).tolist() +  # noqa
-            np.random.choice(contradiction_examples,
-                             size=sample_size,
-                             replace=False).tolist() +  # noqa
-            misc_utils.sort_dict_keys_by_vals(influences)[:sample_size] +  # noqa
-            misc_utils.sort_dict_keys_by_vals(influences)[-sample_size:]
-        )
-
-        data_tags = (
-            ["random-neutral" for _ in range(sample_size)] +  # noqa
-            ["random-entailment" for _ in range(sample_size)] +  # noqa
-            ["random-contradiction" for _ in range(sample_size)] +  # noqa
-            ["most-negative-influential" for _ in range(sample_size)] +  # noqa
-            ["most-positive-influential" for _ in range(sample_size)]
-        )
-
-        learning_rates = np.logspace(-5, -2.5, 50)
-        losses = compute_new_imitator_losses(
-            trainer=trainer,
-            tags=data_tags,
-            indices=data_indices,
-            task_model=task_model,
-            imitator_model=imitator_model,
-            learning_rates=learning_rates,
-            imitator_test_inputs=imitator_test_inputs,
-            train_inputs_collections=train_inputs_collections,
-            finetune_using_ground_truth_label=finetune_using_ground_truth_label)
-
-        outputs_collections.append({
-            "index": i,
-            "losses": losses,
-            "influences": influences,
-            "test_inputs": test_inputs,
-            "learning_rates": learning_rates,
-            "imitator_test_inputs": imitator_test_inputs
-        })
+        for using_ground_truth in [True, False]:
+            outputs = run_one_imitator_experiment(
+                task_model=task_model,
+                imitator_model=imitator_model,
+                test_inputs=test_inputs,
+                trainer=trainer,
+                train_dataset=mnli_train_dataset,
+                train_inputs_collections=train_inputs_collections,
+                inputs_by_label=inputs_by_label,
+                finetune_using_ground_truth_label=using_ground_truth)
+            outputs["index"] = i
+            outputs_collections.append(outputs)
 
         end_time = time.time()
         print(f"#{len(outputs_collections)}/{len(outputs_collections)}: "
