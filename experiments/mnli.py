@@ -403,6 +403,86 @@ def main(
     return outputs_collections
 
 
+def run_one_imitator_experiment(
+    task_model: torch.nn.Module,
+    imitator_model: torch.nn.Module,
+    test_inputs,
+    trainer: transformers.Trainer,
+    train_dataset: torch.utils.data.Dataset,
+    train_inputs_collections: List,
+    inputs_by_label: Dict[str, List[int]],
+    sample_size: int = 10,
+    num_nearest_neighbors: int = 10000,
+    finetune_using_ground_truth_label: bool = False
+) -> Dict[str, Any]:
+
+    imitator_test_inputs = experimental_make_imitator_inputs(
+        trainer=trainer, task_model=task_model, inputs=test_inputs)
+    # if labels[0] != logits.argmax(axis=1)[0]:
+    #     break
+    faiss_index = influence_helpers.load_faiss_index(
+        trained_on_task_name="mnli",
+        train_task_name="mnli")
+
+    s_test_damp, s_test_scale, s_test_num_samples = influence_helpers.select_s_test_config(
+        trained_on_task_name="mnli",
+        eval_task_name="mnli")
+
+    influences = influence_helpers.compute_influences_simplified(
+        k=num_nearest_neighbors,
+        faiss_index=faiss_index,
+        model=task_model,
+        inputs=test_inputs,
+        train_dataset=train_dataset,
+        use_parallel=False,
+        s_test_damp=s_test_damp,
+        s_test_scale=s_test_scale,
+        s_test_num_samples=s_test_num_samples)
+
+    data_indices = (
+        np.random.choice(inputs_by_label["neutral"],
+                         size=sample_size,
+                         replace=False).tolist() +  # noqa
+        np.random.choice(inputs_by_label["entailment"],
+                         size=sample_size,
+                         replace=False).tolist() +  # noqa
+        np.random.choice(inputs_by_label["contradiction"],
+                         size=sample_size,
+                         replace=False).tolist() +  # noqa
+        misc_utils.sort_dict_keys_by_vals(influences)[:sample_size] +  # noqa
+        misc_utils.sort_dict_keys_by_vals(influences)[-sample_size:]
+    )
+
+    data_tags = (
+        ["random-neutral" for _ in range(sample_size)] +  # noqa
+        ["random-entailment" for _ in range(sample_size)] +  # noqa
+        ["random-contradiction" for _ in range(sample_size)] +  # noqa
+        ["most-negative-influential" for _ in range(sample_size)] +  # noqa
+        ["most-positive-influential" for _ in range(sample_size)]
+    )
+
+    learning_rates = np.logspace(-5, -2.5, 50)
+    losses = compute_new_imitator_losses(
+        trainer=trainer,
+        tags=data_tags,
+        indices=data_indices,
+        task_model=task_model,
+        imitator_model=imitator_model,
+        learning_rates=learning_rates,
+        imitator_test_inputs=imitator_test_inputs,
+        train_inputs_collections=train_inputs_collections,
+        finetune_using_ground_truth_label=finetune_using_ground_truth_label)
+
+    return {
+        "losses": losses,
+        "influences": influences,
+        "test_inputs": test_inputs,
+        "learning_rates": learning_rates,
+        "imitator_test_inputs": imitator_test_inputs,
+        "finetune_using_ground_truth_label": finetune_using_ground_truth_label,
+    }
+
+
 def compute_new_imitator_losses(
         indices: List[int],
         tags: List[str],
