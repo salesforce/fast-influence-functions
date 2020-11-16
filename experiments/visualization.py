@@ -1,5 +1,5 @@
-import torch
 import numpy as np
+import pandas as pd
 from tqdm import tqdm, trange
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
@@ -7,7 +7,7 @@ from matplotlib.axes._subplots import Subplot
 # from graph_tool.draw import graph_draw
 # from joblib import Parallel, delayed
 
-from typing import List, Dict, Tuple, Optional, Union, Callable
+from typing import List, Dict, Tuple, Optional, Union, Callable, Any
 from experiments.visualization_utils import (
     get_circle_coordinates,
     get_within_circle_constraint,
@@ -594,3 +594,52 @@ def plot_Xs_and_Ys_dict(
 
     if output_file_name is not None:
         plt.savefig(output_file_name)
+
+
+def collect_edges_from_graph(
+        g: gt.Graph,
+        vertex_color_to_slice_map: Dict[int, str]
+) -> Tuple[pd.DataFrame, List[Dict[str, Any]]]:
+
+    edge_collections = []
+    edge_to_color_map = g.vertex_properties["colors"]
+    edge_to_data_index_map = g.vertex_properties["data_indices"]
+    for edge in tqdm(g.edges()):
+        source_vertex = edge.source()
+        target_vertex = edge.target()
+        source_vertex_color = edge_to_color_map[source_vertex]
+        target_vertex_color = edge_to_color_map[target_vertex]
+        source_vertex_data_index = edge_to_data_index_map[source_vertex]
+        target_vertex_data_index = edge_to_data_index_map[target_vertex]
+
+        # source vertex should be training data
+        if not source_vertex_data_index.startswith("train"):
+            raise ValueError
+
+        # target vertex should be evaluation data
+        if not target_vertex_data_index.startswith("eval"):
+            raise ValueError
+
+        # train vertex should have this color
+        if source_vertex_color != DEFAULT_TRAIN_VERTEX_COLOR:
+            raise ValueError
+
+        # eval vertex should not have this color
+        if target_vertex_color == DEFAULT_TRAIN_VERTEX_COLOR:
+            raise ValueError
+
+        edge_collection = {
+            "edge": edge,
+            "target_slice": vertex_color_to_slice_map[target_vertex_color],
+            "source_vertex_data_index": source_vertex_data_index,
+            "target_vertex_data_index": target_vertex_data_index,
+        }
+
+        for property_name, property_map in g.edge_properties.items():
+            if property_name in edge_collection.keys():
+                raise ValueError(f"Duplicate key {property_name}")
+            edge_collection[property_name] = property_map[edge]
+
+        edge_collections.append(edge_collection)
+
+    return pd.DataFrame(edge_collections), edge_collections
