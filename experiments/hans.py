@@ -31,6 +31,7 @@ def main(
         eval_heuristics: Optional[List[str]] = None,
         num_replicas: Optional[int] = None,
         use_parallel: bool = True,
+        version: Optional[str] = None,
 ) -> Dict[str, List[Dict[str, Any]]]:
 
     if eval_heuristics is None:
@@ -38,6 +39,12 @@ def main(
 
     if num_replicas is None:
         num_replicas = DEFAULT_NUM_REPLICAS
+
+    if version is None:
+        version == "one_experiment_2"
+
+    if version not in ["one_experiment", "one_experiment_2"]:
+        raise ValueError
 
     task_tokenizer, task_model = misc_utils.create_tokenizer_and_model(
         constants.MNLI2_MODEL_PATH)
