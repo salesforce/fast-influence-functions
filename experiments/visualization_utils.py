@@ -78,9 +78,9 @@ def get_within_circle_constraint(r: float) -> Callable[[List[float]], float]:
 def plot_influences_distribution(
         influences_collections: List[Dict[int, float]],
         label: str,
-        hist_range: Tuple[float, float]) -> None:
+        hist_xrange: Tuple[float, float]) -> None:
 
     influences: List[float] = []
     for L in influences_collections:
         influences.extend(L.values())
-    plt.hist(influences, label=label, range=hist_range)
+    plt.hist(influences, label=label, range=hist_xrange)
