@@ -148,7 +148,8 @@ def one_experiment(
     params_filter: List[str],
     weight_decay_ignores: List[str],
     trainer: transformers.Trainer,
-) -> Dict[str, Any]:
+    version: str,
+) -> Tuple[Dict[str, Any], Optional[torch.nn.Module]]:
     if task_model.device.type != "cuda":
         raise ValueError("The model is supposed to be on CUDA")
 
@@ -196,50 +197,52 @@ def one_experiment(
 
     loss_collections = {}
     accuracy_collections = {}
-    num_datapoints_choices = [1, 10, 100]
-    learning_rate_choices = [1e-5, 1e-4, 1e-3]
-    for num_datapoints in num_datapoints_choices:
-        for learning_rate in learning_rate_choices:
-            datapoints = [
-                hans_train_dataset[index]
-                for index in datapoint_indices[:num_datapoints]]
-            batch = default_data_collator(datapoints)
-            new_model, _ = pseudo_gradient_step(
-                model=task_model,
-                inputs=batch,
-                learning_rate=learning_rate,
-                params_filter=params_filter,
-                weight_decay_ignores=weight_decay_ignores)
 
-            for heuristic in eval_heuristics:
-                new_model_loss, new_model_accuracy = evaluate_heuristic(
-                    hans_helper=hans_helper,
-                    heuristic=heuristic,
-                    trainer=trainer,
-                    model=new_model)
+    if version == "old":
+        num_datapoints_choices = [1, 10, 100]
+        learning_rate_choices = [1e-5, 1e-4, 1e-3]
+        for num_datapoints in num_datapoints_choices:
+            for learning_rate in learning_rate_choices:
+                datapoints = [
+                    hans_train_dataset[index]
+                    for index in datapoint_indices[:num_datapoints]]
+                batch = default_data_collator(datapoints)
+                new_model, _ = pseudo_gradient_step(
+                    model=task_model,
+                    inputs=batch,
+                    learning_rate=learning_rate,
+                    params_filter=params_filter,
+                    weight_decay_ignores=weight_decay_ignores)
 
-                loss_collections[
-                    f"{num_datapoints}-"
-                    f"{learning_rate}-"
-                    f"{heuristic}"] = new_model_loss
+                for heuristic in eval_heuristics:
+                    new_model_loss, new_model_accuracy = evaluate_heuristic(
+                        hans_helper=hans_helper,
+                        heuristic=heuristic,
+                        trainer=trainer,
+                        model=new_model)
 
-                accuracy_collections[
-                    f"{num_datapoints}-"
-                    f"{learning_rate}-"
-                    f"{heuristic}"] = new_model_accuracy
-                # print(f"Finished {num_datapoints}-{learning_rate}")
+                    loss_collections[
+                        f"{num_datapoints}-"
+                        f"{learning_rate}-"
+                        f"{heuristic}"] = new_model_loss
 
-    output_collections = {
-        # "s_test": s_test,
-        "influences": influences,
-        "loss": loss_collections,
-        "accuracy": accuracy_collections,
-        "datapoint_indices": datapoint_indices,
-        "learning_rates": learning_rate_choices,
-        "num_datapoints": num_datapoints_choices,
-        "hans_eval_heuristic_inputs": hans_eval_heuristic_inputs,
-    }
-    return output_collections
+                    accuracy_collections[
+                        f"{num_datapoints}-"
+                        f"{learning_rate}-"
+                        f"{heuristic}"] = new_model_accuracy
+                    # print(f"Finished {num_datapoints}-{learning_rate}")
+
+        output_collections = {
+            # "s_test": s_test,
+            "influences": influences,
+            "loss": loss_collections,
+            "accuracy": accuracy_collections,
+            "datapoint_indices": datapoint_indices,
+            "learning_rates": learning_rate_choices,
+            "num_datapoints": num_datapoints_choices,
+            "hans_eval_heuristic_inputs": hans_eval_heuristic_inputs,
+        }
+        return output_collections, None
 
 
 def pseudo_gradient_step(
