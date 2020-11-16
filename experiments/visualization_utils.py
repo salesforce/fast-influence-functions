@@ -82,4 +82,4 @@ def plot_influences_distribution(
     influences: List[float] = []
     for L in influences_collections:
         influences.extend(L.values())
-    plt.hist(influences, label=label)
+    plt.hist(influences, label=label, range=(-0.1, 0.05))
