@@ -98,16 +98,6 @@ def main(
         compute_metrics=build_compute_metrics_fn("mnli-2"),
     )
 
-    params_filter = [
-        n for n, p in task_model.named_parameters()
-        if not p.requires_grad]
-
-    weight_decay_ignores = [
-        "bias",
-        "LayerNorm.weight"] + [
-        n for n, p in task_model.named_parameters()
-        if not p.requires_grad]
-
     output_collections = defaultdict(list)
     with tqdm(total=len(EXPERIMENT_TYPES) * num_replicas) as pbar:
         for experiment_type in EXPERIMENT_TYPES:
