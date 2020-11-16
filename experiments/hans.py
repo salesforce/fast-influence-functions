@@ -13,6 +13,7 @@ from influence_utils import nn_influence_utils
 from experiments import constants
 from experiments import misc_utils
 from experiments import remote_utils
+from experiments import influence_helpers
 from experiments.hans_utils import HansHelper
 from transformers import TrainingArguments
 from experiments.data_utils import (
@@ -160,61 +161,20 @@ def one_experiment(
             inputs=hans_eval_heuristic_inputs,
             device=task_model.device)
 
-        if faiss_index is not None:
-            features = misc_utils.compute_BERT_CLS_feature(
-                task_model, **hans_eval_heuristic_inputs)
-            features = features.cpu().detach().numpy()
-            # We use the mean embedding as the final query here
-            features = features.mean(axis=0, keepdims=True)
-            KNN_distances, KNN_indices = faiss_index.search(
-                k=DEFAULT_KNN_K, queries=features)
-        else:
-            KNN_indices = None
-
-        if not use_parallel:
-            batch_train_data_loader = misc_utils.get_dataloader(
-                hans_train_dataset,
-                batch_size=1,
-                random=True)
-
-            instance_train_data_loader = misc_utils.get_dataloader(
-                hans_train_dataset,
-                batch_size=1,
-                random=False)
-
-            influences, _, s_test = nn_influence_utils.compute_influences(
-                n_gpu=1,
-                device=torch.device("cuda"),
-                batch_train_data_loader=batch_train_data_loader,
-                instance_train_data_loader=instance_train_data_loader,
-                model=task_model,
-                test_inputs=hans_eval_heuristic_inputs,
-                params_filter=params_filter,
-                weight_decay=constants.WEIGHT_DECAY,
-                weight_decay_ignores=weight_decay_ignores,
-                s_test_damp=5e-3,
-                s_test_scale=1e6,
-                s_test_num_samples=1000,
-                train_indices_to_include=KNN_indices,
-                precomputed_s_test=None)
-        else:
-            influences, s_test = parallel.compute_influences_parallel(
-                # Avoid clash with main process
-                device_ids=[1, 2, 3],
-                train_dataset=hans_train_dataset,
-                batch_size=1,
-                model=task_model,
-                test_inputs=hans_eval_heuristic_inputs,
-                params_filter=params_filter,
-                weight_decay=constants.WEIGHT_DECAY,
-                weight_decay_ignores=weight_decay_ignores,
-                s_test_damp=5e-3,
-                s_test_scale=1e6,
-                s_test_num_samples=1000,
-                train_indices_to_include=KNN_indices,
-                return_s_test=True,
-                debug=False)
-
+        influences = influence_helpers.compute_influences_simplified(
+            k=DEFAULT_KNN_K,
+            faiss_index=faiss_index,
+            model=task_model,
+            inputs=hans_eval_heuristic_inputs,
+            train_dataset=hans_train_dataset,
+            use_parallel=True,
+            s_test_damp=5e-3,
+            s_test_scale=1e4,
+            s_test_num_samples=1000,
+            device_ids=[1, 2, 3],
+            precomputed_s_test=None,
+            faiss_index_use_mean_features_as_query=True,
+        )
         sorted_indices = misc_utils.sort_dict_keys_by_vals(influences)
         if experiment_type == "most-helpful":
             datapoint_indices = sorted_indices
@@ -225,7 +185,7 @@ def one_experiment(
             datapoint_indices = sorted_indices[::-1]
 
     if experiment_type == "random":
-        s_test = None
+        # s_test = None
         influences = None
         hans_eval_heuristic_inputs = None
         # Essentially shuffle the indices
@@ -270,7 +230,7 @@ def one_experiment(
                 # print(f"Finished {num_datapoints}-{learning_rate}")
 
     output_collections = {
-        "s_test": s_test,
+        # "s_test": s_test,
         "influences": influences,
         "loss": loss_collections,
         "accuracy": accuracy_collections,
