@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from typing import List, Callable, Dict
+from typing import List, Callable, Dict, Tuple
 
 
 def get_circle_coordinates(r: float, degree: float):
@@ -77,9 +77,10 @@ def get_within_circle_constraint(r: float) -> Callable[[List[float]], float]:
 
 def plot_influences_distribution(
         influences_collections: List[Dict[int, float]],
-        label: str) -> None:
+        label: str,
+        hist_range: Tuple[float, float]) -> None:
 
     influences: List[float] = []
     for L in influences_collections:
         influences.extend(L.values())
-    plt.hist(influences, label=label, range=(-0.1, 0.05))
+    plt.hist(influences, label=label, range=hist_range)
