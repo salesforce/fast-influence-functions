@@ -42,9 +42,9 @@ def main(
         num_replicas = DEFAULT_NUM_REPLICAS
 
     if version is None:
-        version == "one_experiment_2"
+        version == "new"
 
-    if version not in ["one_experiment", "one_experiment_2"]:
+    if version not in ["old", "new"]:
         raise ValueError
 
     task_tokenizer, task_model = misc_utils.create_tokenizer_and_model(
@@ -99,29 +99,29 @@ def main(
     )
 
     output_collections = defaultdict(list)
-    with tqdm(total=len(EXPERIMENT_TYPES) * num_replicas) as pbar:
-        for experiment_type in EXPERIMENT_TYPES:
-            for replica_index in range(num_replicas):
-                outputs_one_experiment = one_experiment(
-                    use_parallel=use_parallel,
-                    train_heuristic=train_heuristic,
-                    eval_heuristics=eval_heuristics,
-                    experiment_type=experiment_type,
-                    hans_helper=hans_helper,
-                    hans_train_dataset=hans_train_dataset,
-                    task_model=task_model,
-                    faiss_index=faiss_index,
-                    params_filter=params_filter,
-                    weight_decay_ignores=weight_decay_ignores,
-                    trainer=trainer)
-                output_collections[experiment_type].append(outputs_one_experiment)
+    if version == "old":
+        with tqdm(total=len(EXPERIMENT_TYPES) * num_replicas) as pbar:
+            for experiment_type in EXPERIMENT_TYPES:
+                for replica_index in range(num_replicas):
+                    outputs_one_experiment, _ = one_experiment(
+                        use_parallel=use_parallel,
+                        train_heuristic=train_heuristic,
+                        eval_heuristics=eval_heuristics,
+                        experiment_type=experiment_type,
+                        hans_helper=hans_helper,
+                        hans_train_dataset=hans_train_dataset,
+                        task_model=task_model,
+                        faiss_index=faiss_index,
+                        trainer=trainer,
+                        version=version)
+                    output_collections[experiment_type].append(outputs_one_experiment)
 
-                pbar.update(1)
-                pbar.set_description(f"{experiment_type} #{replica_index}")
+                    pbar.update(1)
+                    pbar.set_description(f"{experiment_type} #{replica_index}")
 
-    remote_utils.save_and_mirror_scp_to_remote(
-        object_to_save=output_collections,
-        file_name=f"hans-augmentation.{train_heuristic}.{num_replicas}.pth")
+        remote_utils.save_and_mirror_scp_to_remote(
+            object_to_save=output_collections,
+            file_name=f"hans-augmentation.{train_heuristic}.{num_replicas}.pth")
 
     return output_collections
 
