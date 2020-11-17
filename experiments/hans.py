@@ -100,7 +100,8 @@ def main(
 
     output_collections = defaultdict(list)
     if version == "old":
-        with tqdm(total=len(EXPERIMENT_TYPES) * num_replicas) as pbar:
+        num_total_experiments = len(EXPERIMENT_TYPES) * num_replicas
+        with tqdm(total=num_total_experiments) as pbar:
             for experiment_type in EXPERIMENT_TYPES:
                 for replica_index in range(num_replicas):
                     outputs_one_experiment, _ = one_experiment(
