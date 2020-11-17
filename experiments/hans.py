@@ -25,6 +25,8 @@ DEFAULT_KNN_K = 1000
 DEFAULT_NUM_REPLICAS = 3
 EXPERIMENT_TYPES = ["most-helpful", "most-harmful", "random"]
 DEFAULT_EVAL_HEURISTICS = ["lexical_overlap", "subsequence", "constituent"]
+VERSION_2_NUM_DATAPOINTS_CHOICES = [1, 10]
+VERSION_2_LEARNING_RATE_CHOICES = [1e-5, 1e-4]
 
 
 def main(
@@ -123,6 +125,54 @@ def main(
         remote_utils.save_and_mirror_scp_to_remote(
             object_to_save=output_collections,
             file_name=f"hans-augmentation.{train_heuristic}.{num_replicas}.pth")
+
+    else:
+        NUM_STEPS = 10
+        num_total_experiments = (
+            len(EXPERIMENT_TYPES) *
+            num_replicas *
+            len(VERSION_2_LEARNING_RATE_CHOICES) *
+            len(VERSION_2_LEARNING_RATE_CHOICES) *
+            NUM_STEPS
+        )
+
+        with tqdm(total=num_total_experiments) as pbar:
+            for experiment_type in EXPERIMENT_TYPES:
+                for replica_index in range(num_replicas):
+                    for version_2_num_datapoints in VERSION_2_NUM_DATAPOINTS_CHOICES:
+                        for version_2_learning_rate in VERSION_2_LEARNING_RATE_CHOICES:
+
+                            # The model will be used for multiple
+                            # steps so `deepcopy` it here.
+                            _model = deepcopy(task_model)
+                            for step in range(NUM_STEPS):
+                                outputs_one_experiment, _model = one_experiment(
+                                    use_parallel=use_parallel,
+                                    train_heuristic=train_heuristic,
+                                    eval_heuristics=eval_heuristics,
+                                    experiment_type=experiment_type,
+                                    hans_helper=hans_helper,
+                                    hans_train_dataset=mnli_train_dataset,
+                                    task_model=_model,
+                                    faiss_index=faiss_index,
+                                    trainer=trainer,
+                                    version=version,
+                                    version_2_num_datapoints=version_2_num_datapoints,
+                                    version_2_learning_rate=version_2_learning_rate)
+
+                                output_collections[
+                                    f"{experiment_type}-"
+                                    f"{replica_index}-"
+                                    f"{version_2_num_datapoints}-"
+                                    f"{version_2_learning_rate}-"
+                                ].append(outputs_one_experiment)
+
+                                pbar.update(1)
+                                pbar.set_description(f"{experiment_type} #{replica_index}")
+
+        # remote_utils.save_and_mirror_scp_to_remote(
+        #     object_to_save=output_collections,
+        #     file_name=f"hans-augmentation-v2.{train_heuristic}.{num_replicas}.pth")
 
     return output_collections
 
