@@ -135,8 +135,6 @@ def one_experiment(
     hans_train_dataset: CustomGlueDataset,
     task_model: torch.nn.Module,
     faiss_index: faiss_utils.FAISSIndex,
-    params_filter: List[str],
-    weight_decay_ignores: List[str],
     trainer: transformers.Trainer,
     version: str,
     version_2_num_datapoints: Optional[int] = None,
@@ -202,9 +200,7 @@ def one_experiment(
                 new_model, _ = pseudo_gradient_step(
                     model=task_model,
                     inputs=batch,
-                    learning_rate=learning_rate,
-                    params_filter=params_filter,
-                    weight_decay_ignores=weight_decay_ignores)
+                    learning_rate=learning_rate)
 
                 for heuristic in eval_heuristics:
                     new_model_loss, new_model_accuracy = evaluate_heuristic(
@@ -254,9 +250,7 @@ def one_experiment(
         new_model, _ = pseudo_gradient_step(
             model=task_model,
             inputs=batch,
-            learning_rate=learning_rate,
-            params_filter=params_filter,
-            weight_decay_ignores=weight_decay_ignores)
+            learning_rate=learning_rate)
 
         for heuristic in eval_heuristics:
             new_model_loss, new_model_accuracy = evaluate_heuristic(
@@ -288,10 +282,18 @@ def pseudo_gradient_step(
         model: torch.nn.Module,
         inputs: Dict[str, Union[torch.Tensor, Any]],
         learning_rate: float,
-        params_filter: List[str],
-        weight_decay_ignores: List[str],
         precomputed_gradients_z: Optional[List[torch.FloatTensor]] = None
 ) -> Tuple[torch.nn.Module, List[torch.FloatTensor]]:
+
+    params_filter = [
+        n for n, p in model.named_parameters()
+        if not p.requires_grad]
+
+    weight_decay_ignores = [
+        "bias",
+        "LayerNorm.weight"] + [
+        n for n, p in model.named_parameters()
+        if not p.requires_grad]
 
     params_to_freeze = [
         "bert.embeddings.",
