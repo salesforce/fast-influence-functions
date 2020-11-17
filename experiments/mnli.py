@@ -386,6 +386,7 @@ def run_one_imitator_experiment(
 
     s_test_damp, s_test_scale, s_test_num_samples = influence_helpers.select_s_test_config(
         trained_on_task_name="mnli",
+        train_task_name="mnli",
         eval_task_name="mnli")
 
     influences = influence_helpers.compute_influences_simplified(

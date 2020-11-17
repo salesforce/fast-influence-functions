@@ -154,6 +154,7 @@ def main(
      s_test_scale,
      s_test_num_samples) = influence_helpers.select_s_test_config(
         trained_on_task_name=trained_on_task_name,
+        train_task_name=train_task_name,
         eval_task_name=eval_task_name)
 
     influences_collections = []

@@ -41,9 +41,13 @@ def load_faiss_index(
 
 
 def select_s_test_config(
-    trained_on_task_name: str,
-    eval_task_name: str,
+        trained_on_task_name: str,
+        train_task_name: str,
+        eval_task_name: str,
 ) -> Tuple[float, float, int]:
+
+    if trained_on_task_name != train_task_name:
+        raise ValueError("Unsupported as of now")
 
     if trained_on_task_name not in ["mnli", "mnli-2", "hans"]:
         raise ValueError
