@@ -99,6 +99,7 @@ def compute_influences_simplified(
         s_test_num_samples: int,
         device_ids: Optional[List[int]] = None,
         precomputed_s_test: Optional[List[torch.FloatTensor]] = None,
+        faiss_index_use_mean_features_as_query: bool = False,
 ) -> Tuple[Dict[int, float]]:
 
     # Make sure indices are sorted according to distances
@@ -120,6 +121,11 @@ def compute_influences_simplified(
     if faiss_index is not None:
         features = misc_utils.compute_BERT_CLS_feature(model, **inputs)
         features = features.cpu().detach().numpy()
+
+        if faiss_index_use_mean_features_as_query is True:
+            # We use the mean embedding as the final query here
+            features = features.mean(axis=0, keepdims=True)
+
         KNN_distances, KNN_indices = faiss_index.search(
             k=k, queries=features)
     else:
