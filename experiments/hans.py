@@ -30,12 +30,16 @@ VERSION_2_LEARNING_RATE_CHOICES = [1e-5, 1e-4]
 
 
 def main(
+        train_task_name: str,
         train_heuristic: str,
         eval_heuristics: Optional[List[str]] = None,
         num_replicas: Optional[int] = None,
         use_parallel: bool = True,
         version: Optional[str] = None,
 ) -> Dict[str, List[Dict[str, Any]]]:
+
+    if train_task_name not in ["mnli-2", "hans"]:
+        raise ValueError
 
     if eval_heuristics is None:
         eval_heuristics = DEFAULT_EVAL_HEURISTICS
@@ -68,8 +72,10 @@ def main(
 
     # We will be running model trained on MNLI-2
     # but calculate influences on HANS dataset
-    faiss_index = faiss_utils.FAISSIndex(768, "Flat")
-    faiss_index.load(constants.MNLI2_HANS_FAISS_INDEX_PATH)
+    faiss_index = influence_helpers.load_faiss_index(
+        trained_on_task_name="mnli-2",
+        train_task_name=train_task_name
+    )
 
     output_mode = glue_output_modes["mnli-2"]
 
@@ -94,10 +100,6 @@ def main(
             per_device_eval_batch_size=128,
             learning_rate=5e-5,
             logging_steps=100),
-        data_collator=default_data_collator,
-        train_dataset=mnli_train_dataset,
-        eval_dataset=hans_eval_dataset,
-        compute_metrics=build_compute_metrics_fn("mnli-2"),
     )
 
     output_collections = defaultdict(list)
