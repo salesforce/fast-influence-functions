@@ -116,7 +116,8 @@ def main(
             logging_steps=100),
     )
 
-    output_collections = defaultdict(list)
+    output_collections: Dict[str, List] = defaultdict(list)
+
     if version == "old":
         num_total_experiments = len(EXPERIMENT_TYPES) * num_replicas
         with tqdm(total=num_total_experiments) as pbar:
@@ -192,9 +193,13 @@ def main(
                                 pbar.update(1)
                                 pbar.set_description(f"{experiment_type} #{replica_index}")
 
-        # remote_utils.save_and_mirror_scp_to_remote(
-        #     object_to_save=output_collections,
-        #     file_name=f"hans-augmentation-v2.{train_heuristic}.{num_replicas}.pth")
+        torch.save(
+            output_collections,
+            f"hans-augmentation-{version}."
+            f"{train_task_name}."
+            f"{train_heuristic}."
+            f"{num_replicas}."
+            f"{use_parallel}.pth")
 
     return output_collections
 
