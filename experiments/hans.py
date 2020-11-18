@@ -48,7 +48,7 @@ def main(
         num_replicas = DEFAULT_NUM_REPLICAS
 
     if version is None:
-        version == "new"
+        version = "new"
 
     if version not in ["old", "new"]:
         raise ValueError
