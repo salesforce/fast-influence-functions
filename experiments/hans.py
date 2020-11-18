@@ -66,6 +66,11 @@ def main(
         task_name="hans",
         tokenizer=task_tokenizer)
 
+    if train_task_name == "mnli-2":
+        train_dataset = mnli_train_dataset
+
+    if train_task_name == "hans":
+        train_dataset = hans_train_dataset
 
     (s_test_damp,
      s_test_scale,
@@ -123,7 +128,7 @@ def main(
                         eval_heuristics=eval_heuristics,
                         experiment_type=experiment_type,
                         hans_helper=hans_helper,
-                        train_dataset=hans_train_dataset,
+                        train_dataset=train_dataset,
                         task_model=task_model,
                         faiss_index=faiss_index,
                         s_test_damp=s_test_damp,
@@ -166,7 +171,7 @@ def main(
                                     eval_heuristics=eval_heuristics,
                                     experiment_type=experiment_type,
                                     hans_helper=hans_helper,
-                                    train_dataset=mnli_train_dataset,
+                                    train_dataset=train_dataset,
                                     task_model=_model,
                                     faiss_index=faiss_index,
                                     s_test_damp=s_test_damp,
