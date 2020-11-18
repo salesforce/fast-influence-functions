@@ -25,8 +25,8 @@ DEFAULT_KNN_K = 1000
 DEFAULT_NUM_REPLICAS = 3
 EXPERIMENT_TYPES = ["most-helpful", "most-harmful", "random"]
 DEFAULT_EVAL_HEURISTICS = ["lexical_overlap", "subsequence", "constituent"]
-VERSION_2_NUM_DATAPOINTS_CHOICES = [1, 10]
-VERSION_2_LEARNING_RATE_CHOICES = [1e-5, 1e-4]
+VERSION_2_NUM_DATAPOINTS_CHOICES = [1]
+VERSION_2_LEARNING_RATE_CHOICES = [1e-4]
 
 
 def main(
