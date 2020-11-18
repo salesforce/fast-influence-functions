@@ -234,7 +234,7 @@ def one_experiment(
             model=task_model,
             inputs=hans_eval_heuristic_inputs,
             train_dataset=train_dataset,
-            use_parallel=True,
+            use_parallel=use_parallel,
             s_test_damp=s_test_damp,
             s_test_scale=s_test_scale,
             s_test_num_samples=s_test_num_samples,
