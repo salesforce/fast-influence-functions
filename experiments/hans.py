@@ -112,7 +112,7 @@ def main(
                         eval_heuristics=eval_heuristics,
                         experiment_type=experiment_type,
                         hans_helper=hans_helper,
-                        hans_train_dataset=hans_train_dataset,
+                        train_dataset=hans_train_dataset,
                         task_model=task_model,
                         faiss_index=faiss_index,
                         trainer=trainer,
@@ -131,7 +131,7 @@ def main(
         num_total_experiments = (
             len(EXPERIMENT_TYPES) *
             num_replicas *
-            len(VERSION_2_LEARNING_RATE_CHOICES) *
+            len(VERSION_2_NUM_DATAPOINTS_CHOICES) *
             len(VERSION_2_LEARNING_RATE_CHOICES) *
             NUM_STEPS
         )
@@ -152,7 +152,7 @@ def main(
                                     eval_heuristics=eval_heuristics,
                                     experiment_type=experiment_type,
                                     hans_helper=hans_helper,
-                                    hans_train_dataset=mnli_train_dataset,
+                                    train_dataset=mnli_train_dataset,
                                     task_model=_model,
                                     faiss_index=faiss_index,
                                     trainer=trainer,
@@ -183,7 +183,7 @@ def one_experiment(
     eval_heuristics: List[str],
     experiment_type: str,
     hans_helper: HansHelper,
-    hans_train_dataset: CustomGlueDataset,
+    train_dataset: CustomGlueDataset,
     task_model: torch.nn.Module,
     faiss_index: faiss_utils.FAISSIndex,
     trainer: transformers.Trainer,
@@ -208,7 +208,7 @@ def one_experiment(
             faiss_index=faiss_index,
             model=task_model,
             inputs=hans_eval_heuristic_inputs,
-            train_dataset=hans_train_dataset,
+            train_dataset=train_dataset,
             use_parallel=True,
             s_test_damp=5e-3,
             s_test_scale=1e4,
@@ -232,8 +232,8 @@ def one_experiment(
         hans_eval_heuristic_inputs = None
         # Essentially shuffle the indices
         datapoint_indices = np.random.choice(
-            len(hans_train_dataset),
-            size=len(hans_train_dataset),
+            len(train_dataset),
+            size=len(train_dataset),
             replace=False)
 
     loss_collections = {}
@@ -245,7 +245,7 @@ def one_experiment(
         for num_datapoints in num_datapoints_choices:
             for learning_rate in learning_rate_choices:
                 datapoints = [
-                    hans_train_dataset[index]
+                    train_dataset[index]
                     for index in datapoint_indices[:num_datapoints]]
                 batch = default_data_collator(datapoints)
                 new_model, _ = pseudo_gradient_step(
@@ -295,7 +295,7 @@ def one_experiment(
         learning_rate = version_2_learning_rate
 
         datapoints = [
-            hans_train_dataset[index]
+            train_dataset[index]
             for index in datapoint_indices[:num_datapoints]]
         batch = default_data_collator(datapoints)
         new_model, _ = pseudo_gradient_step(
