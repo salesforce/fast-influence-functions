@@ -47,7 +47,16 @@ def select_s_test_config(
 ) -> Tuple[float, float, int]:
 
     if trained_on_task_name != train_task_name:
-        raise ValueError("Unsupported as of now")
+        # Only this setting is supported for now
+        # basically, the config for this combination
+        # of `trained_on_task_name` and `eval_task_name`
+        # would be fine, so not raising issues here for now.
+        if not all([
+            trained_on_task_name == "mnli-2",
+            train_task_name == "hans",
+            eval_task_name == "hans"
+        ]):
+            raise ValueError("Unsupported as of now")
 
     if trained_on_task_name not in ["mnli", "mnli-2", "hans"]:
         raise ValueError

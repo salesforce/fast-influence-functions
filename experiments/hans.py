@@ -66,6 +66,15 @@ def main(
         task_name="hans",
         tokenizer=task_tokenizer)
 
+
+    (s_test_damp,
+     s_test_scale,
+     s_test_num_samples) = influence_helpers.select_s_test_config(
+        trained_on_task_name="mnli-2",
+        train_task_name=train_task_name,
+        eval_task_name="hans",
+    )
+
     hans_helper = HansHelper(
         hans_train_dataset=hans_train_dataset,
         hans_eval_dataset=hans_eval_dataset)
@@ -117,6 +126,9 @@ def main(
                         train_dataset=hans_train_dataset,
                         task_model=task_model,
                         faiss_index=faiss_index,
+                        s_test_damp=s_test_damp,
+                        s_test_scale=s_test_scale,
+                        s_test_num_samples=s_test_num_samples,
                         trainer=trainer,
                         version=version)
                     output_collections[experiment_type].append(outputs_one_experiment)
@@ -157,6 +169,9 @@ def main(
                                     train_dataset=mnli_train_dataset,
                                     task_model=_model,
                                     faiss_index=faiss_index,
+                                    s_test_damp=s_test_damp,
+                                    s_test_scale=s_test_scale,
+                                    s_test_num_samples=s_test_num_samples,
                                     trainer=trainer,
                                     version=version,
                                     version_2_num_datapoints=version_2_num_datapoints,
@@ -188,6 +203,9 @@ def one_experiment(
     train_dataset: CustomGlueDataset,
     task_model: torch.nn.Module,
     faiss_index: faiss_utils.FAISSIndex,
+    s_test_damp: float,
+    s_test_scale: float,
+    s_test_num_samples: int,
     trainer: transformers.Trainer,
     version: str,
     version_2_num_datapoints: Optional[int] = None,
@@ -212,9 +230,9 @@ def one_experiment(
             inputs=hans_eval_heuristic_inputs,
             train_dataset=train_dataset,
             use_parallel=True,
-            s_test_damp=5e-3,
-            s_test_scale=1e4,
-            s_test_num_samples=1000,
+            s_test_damp=s_test_damp,
+            s_test_scale=s_test_scale,
+            s_test_num_samples=s_test_num_samples,
             device_ids=[1, 2, 3],
             precomputed_s_test=None,
             faiss_index_use_mean_features_as_query=True,
