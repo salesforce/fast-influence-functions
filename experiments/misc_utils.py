@@ -4,7 +4,7 @@ import numpy as np
 # from tqdm import tqdm
 from torch.utils.data.dataloader import DataLoader
 from torch.utils.data.sampler import SequentialSampler, RandomSampler
-from typing import Tuple, Optional, Union, Any, Dict, List
+from typing import Tuple, Optional, Union, Any, Dict, List, Callable
 from transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
@@ -24,6 +24,17 @@ def sort_dict_keys_by_vals(d: Dict[int, float]) -> List[int]:
     sorted_items = sorted(list(d.items()),
                           key=lambda pair: pair[1])
     return [pair[0] for pair in sorted_items]
+
+
+def sort_dict_keys_by_vals_with_conditions(
+        d: Dict[int, float],
+        condition_func: Callable[[Tuple[int, float]], bool]
+) -> List[int]:
+
+    sorted_items = sorted(list(d.items()),
+                          key=lambda pair: pair[1])
+    return [pair[0] for pair in sorted_items
+            if condition_func(pair)]
 
 
 def compute_BERT_CLS_feature(
