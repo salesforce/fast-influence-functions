@@ -77,14 +77,9 @@ def run_retraining_main(
                         influences_dict["correct"] is True):
                     raise ValueError
 
-                helpful_indices = misc_utils.sort_dict_keys_by_vals_with_conditions(
-                    influences_dict["influences"],
-                    condition_func=lambda k_v: k_v[1] < 0.0
-                )
-                harmful_indices = misc_utils.sort_dict_keys_by_vals_with_conditions(
-                    influences_dict["influences"],
-                    condition_func=lambda k_v: k_v[1] > 0.0
-                )[::-1]
+                helpful_indices, harmful_indices = (
+                    misc_utils.get_helpful_harmful_indices_from_influences_dict(
+                        influences_dict["influences"]))
 
                 indices_dict = {
                     "helpful": helpful_indices,
@@ -107,14 +102,9 @@ def run_retraining_main(
                 if example_index != influences_dict["index"]:
                     raise ValueError
 
-                helpful_indices = misc_utils.sort_dict_keys_by_vals_with_conditions(
-                    influences_dict["influences"],
-                    condition_func=lambda k_v: k_v[1] < 0.0
-                )
-                harmful_indices = misc_utils.sort_dict_keys_by_vals_with_conditions(
-                    influences_dict["influences"],
-                    condition_func=lambda k_v: k_v[1] > 0.0
-                )[::-1]
+                helpful_indices, harmful_indices = (
+                    misc_utils.get_helpful_harmful_indices_from_influences_dict(
+                        influences_dict["influences"]))
 
                 indices_dict = {
                     "helpful": helpful_indices,
