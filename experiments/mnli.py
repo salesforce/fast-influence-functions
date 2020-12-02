@@ -77,9 +77,15 @@ def run_retraining_main(
                         influences_dict["correct"] is True):
                     raise ValueError
 
-                helpful_indices = misc_utils.sort_dict_keys_by_vals(
-                    influences_dict["influences"])
-                harmful_indices = helpful_indices[::-1]
+                helpful_indices = misc_utils.sort_dict_keys_by_vals_with_conditions(
+                    influences_dict["influences"],
+                    condition_func=lambda k_v: k_v[1] < 0.0
+                )
+                harmful_indices = misc_utils.sort_dict_keys_by_vals_with_conditions(
+                    influences_dict["influences"],
+                    condition_func=lambda k_v: k_v[1] > 0.0
+                )[::-1]
+
                 indices_dict = {
                     "helpful": helpful_indices,
                     "harmful": harmful_indices}
@@ -101,9 +107,15 @@ def run_retraining_main(
                 if example_index != influences_dict["index"]:
                     raise ValueError
 
-                helpful_indices = misc_utils.sort_dict_keys_by_vals(
-                    influences_dict["influences"])
-                harmful_indices = helpful_indices[::-1]
+                helpful_indices = misc_utils.sort_dict_keys_by_vals_with_conditions(
+                    influences_dict["influences"],
+                    condition_func=lambda k_v: k_v[1] < 0.0
+                )
+                harmful_indices = misc_utils.sort_dict_keys_by_vals_with_conditions(
+                    influences_dict["influences"],
+                    condition_func=lambda k_v: k_v[1] > 0.0
+                )[::-1]
+
                 indices_dict = {
                     "helpful": helpful_indices,
                     "harmful": harmful_indices}
@@ -122,6 +134,10 @@ def run_retraining_main(
 
             for tag, indices in indices_dict.items():
                 for num_data_points_to_remove in NUM_DATAPOINTS_TO_REMOVE_CHOICES:
+                    if len(indices) < num_data_points_to_remove:
+                        raise ValueError(f"`indices` have only {len(indices)} elememts "
+                                         f"whereas {num_data_points_to_remove} is needed")
+
                     run_one_retraining(
                         indices=indices[:num_data_points_to_remove],
                         dir_name=(
