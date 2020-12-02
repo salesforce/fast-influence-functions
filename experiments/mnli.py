@@ -26,7 +26,7 @@ from experiments.data_utils import (
     glue_compute_metrics)
 
 MNLI_TRAINING_SCRIPT_NAME = "scripts/run_MNLI.20200913.sh"
-NUM_DATAPOINTS_TO_REMOVE_CHOICES = [1, 100, 10000]
+NUM_DATAPOINTS_TO_REMOVE_CHOICES = [1, 10, 100]
 
 CORRECT_INDICES = sorted([
     # e.g., `KNN-recall.only-correct.50.0.pth.g0301.ll.unc.edu`
