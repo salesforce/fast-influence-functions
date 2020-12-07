@@ -1,65 +1,39 @@
-# 0.1
-Interpreting Large Pre-trained Language Models From The Training Set
+# Fast Influence Functions
+![main](figs/main.png)
 
-### Major Changes
-* Runnable docker image and Kubernetes config
-* Added GPT2 model
-* Added `notebooks/`
-* Added wikitext-2 article sanity check experiment
-* Added `utils/exact.py` for computing exact influences.
+# Requirements
+Please see `requirements.txt` and `Dockerfile` for detailed dependencies. The major ones include
+- `python 3.6 or later` (for type annotations and f-string)
+- `pytorch==1.5.1`
+- `transformers==3.0.2`
 
-### Minor Changes
-* Dockerfile
-    - Added `wget`, `unzip`, `psmisc`, `vim`
-    - Added `vimrc`
+# Setup
+### Docker Setup
+To build the docker image, run the following script.
 
-* Requirements
-    - Added `transformers` (`v2.11.0`)
+```bash
+DOCKER_BUILDKIT=1 docker build \
+    -t ${TAG} \
+    -f Dockerfile .
+```
 
+### Data Setup
+1. Download the data following the examples from [here](https://github.com/huggingface/transformers/tree/master/examples/text-classification) and [here](https://github.com/huggingface/transformers/tree/master/examples/adversarial).
+2. Mount the data into `/export/home/Data/Glue` and `/export/home/Data/HANS` inside the image.
 
-# 0.2
-Switching gear towards downstream tasks
+# Experiments
+1. To train the base models, please use `scripts/run_MNLI.sh` and `scripts/run_HANS.sh`.
+2. To build FAISS indices, please see the function `create_FAISS_index` in `experiments/hans.py`.
+3. Modify the paths in `experiments/constants.py` based on your setup.
+4. To run the experiments, please follow the instructions in `run_experiments.py` where we have provided most of the default configurations/hyper-parameters.
 
-### Major Changes
-* Have an initial running version
-* Added `influence_utils.faiss_utils`
-* Adding Faiss [dependency](https://github.com/kyamagu/faiss-wheels)
-* Added support for `textattacks`
-* Fixed a bug where `bert.pooler` parameters were filted during the gradient computation. The bug was caused by that `bert.pooler` parameters are not used in pre-trained LMs, and thus they were filted in the early stages of the codebase where the experiments are still performed on LMs. In the fine-tuned BERT models, however, `bert.pooler` parameters are used.
-* Added nvidia-drivers to Dockerfile, and bumped `torch` base docker image from `1.5.0` to `1.5.1`
+# Code Structure
 
+### `experiments/`
+- This directory contains code that are used to conduct experiments.
+- However, the entry-point for experiments is `run_experiments.py`.
 
-# 0.3
-
-### Major Changes
-* Splitting the implementation of sequential vs parallel influence calculation.
-* Added customized Datasets.
-
-
-# 0.4
-### Major Changes
-* Two `Dockerfile` and `cluster/docker.update.sh` for building in two environments
-* Added `cluster/kube.experiments.yaml` for non-interactive experiments running.
-* `experiments/mnli.py`: support running experiments on examples that with correct and incorrect predictions.
-* `experiments/`: Added `remote_utils.py` for synchronizing files with a remote server.
-* Removed deprecated `language_modeling.py`
-* Added `run_experiments.py` and `scripts/run_experiments.sh` for non-interactive experiments running.
-* Copied the GLUE data download script and paste them into `scripts/down_glue_data.py`.
-* Edited the configuration files for running in different environments.
-* Added demo. To run the demo, do `~/.local/bin/streamlit run run_demo.py`
-* Added `graph_tool` to `Dockerfile.external`
-* Support non-parallel settings in experiments.
-* Added retraining experiments.
-
-
-### Minor Changes
-* Added the missing `.gitignore`.
-* Merged `cluster/docker.run.{gpu|cpu}.sh` into a single file used in custom environment
-* Updated `cluster/docker.update.sh` to include recent file changes.
-* `experiments/constants.py`: added more constants used in `experiments.remote_utils.py`
-* `experiments/misc_utils.py`: added a few more useful tools.
-* Updated `requirements.txt` with libraries used in `experiments/remote_utils.py`
-* Added a few more configurations to `cluster/`
-* Added a few more constants to `experiments/constants.py`
-* Improved flexibility of the demo and visualization.
-
+### `influence_utils/`
+This directory contains the core components of the influence functions. Most of the codes are designed to be independent of the experiments so could be adapted for others downstream needs. Two of the most important ones are:
+- `influence_utils/nn_influence_utils.py` contains the code for influence functions.
+- `influence_utils/parallel.py` contains the code for the parallel variant.

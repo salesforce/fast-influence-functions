@@ -13,9 +13,11 @@ NUM_KNN_RECALL_EXPERIMENTS = 50
 NUM_RETRAINING_EXPERIMENTS = 3
 NUM_STEST_EXPERIMENTS = 10
 NUM_VISUALIZATION_EXPERIMENTS = 100
+NUM_IMITATOR_EXPERIMENTS = 10
 
 
 def KNN_recall_experiments(
+        mode: str,
         num_experiments: Optional[int] = None
 ) -> None:
     """Experiments to Check The Influence Recall of KNN"""
@@ -26,15 +28,12 @@ def KNN_recall_experiments(
 
     # (a) when the prediction is correct, and (b) incorrect
     mnli.run_full_influence_functions(
-        mode="only-correct",
-        num_examples_to_test=num_experiments)
-
-    mnli.run_full_influence_functions(
-        mode="only-incorrect",
+        mode=mode,
         num_examples_to_test=num_experiments)
 
 
 def s_test_speed_quality_tradeoff_experiments(
+        mode: str,
         num_experiments: Optional[int] = None
 ) -> None:
     """Experiments to Check The Speed/Quality Trade-off of `s_test` estimation"""
@@ -45,15 +44,12 @@ def s_test_speed_quality_tradeoff_experiments(
 
     # (a) when the prediction is correct, and (b) incorrect
     s_test_speedup.main(
-        mode="only-correct",
-        num_examples_to_test=num_experiments)
-
-    s_test_speedup.main(
-        mode="only-incorrect",
+        mode=mode,
         num_examples_to_test=num_experiments)
 
 
 def MNLI_retraining_experiments(
+        mode: str,
         num_experiments: Optional[int] = None
 ) -> None:
     print("RUNNING `MNLI_retraining_experiments`")
@@ -62,7 +58,7 @@ def MNLI_retraining_experiments(
         num_experiments = NUM_RETRAINING_EXPERIMENTS
 
     mnli.run_retraining_main(
-        mode="full",
+        mode=mode,
         num_examples_to_test=num_experiments)
 
 
@@ -96,13 +92,33 @@ def visualization_experiments(
 def hans_augmentation_experiments(
         num_replicas: Optional[int] = None
 ) -> None:
+    print("RUNNING `hans_augmentation_experiments`")
     # We will use the all the `train_heuristic` here, as we did in
     # `eval_heuristics`. So looping over the `DEFAULT_EVAL_HEURISTICS`
-    for train_heuristic in hans.DEFAULT_EVAL_HEURISTICS:
-        hans.main(
-            train_heuristic=train_heuristic,
-            num_replicas=num_replicas,
-            use_parallel=USE_PARALLEL)
+    for train_task_name in ["mnli-2", "hans"]:
+        for train_heuristic in hans.DEFAULT_EVAL_HEURISTICS:
+            hans.main(
+                train_task_name=train_task_name,
+                train_heuristic=train_heuristic,
+                num_replicas=num_replicas,
+                use_parallel=USE_PARALLEL)
+
+
+def imitator_experiments(
+        num_experiments: Optional[int] = None
+) -> None:
+    print("RUNNING `imitator_experiments`")
+
+    if num_experiments is None:
+        num_experiments = NUM_IMITATOR_EXPERIMENTS
+
+    mnli.imitator_main(
+        mode="only-correct",
+        num_examples_to_test=num_experiments)
+
+    mnli.imitator_main(
+        mode="only-incorrect",
+        num_examples_to_test=num_experiments)
 
 
 # ------------------------------------------------------------------
@@ -124,11 +140,40 @@ if __name__ == "__main__":
     remote_utils.setup_and_verify_environment()
 
     experiment_name = sys.argv[1]
-    if experiment_name == "s-test":
-        s_test_speed_quality_tradeoff_experiments()
+    if experiment_name == "knn-recall-correct":
+        KNN_recall_experiments(
+            mode="only-correct")
+    if experiment_name == "knn-recall-incorrect":
+        KNN_recall_experiments(
+            mode="only-incorrect")
 
-    if experiment_name == "retraining":
-        MNLI_retraining_experiments()
+    if experiment_name == "s-test-correct":
+        s_test_speed_quality_tradeoff_experiments(
+            mode="only-correct")
+    if experiment_name == "s-test-incorrect":
+        s_test_speed_quality_tradeoff_experiments(
+            mode="only-incorrect")
+
+    if experiment_name == "retraining-full":
+        MNLI_retraining_experiments(
+            mode="full")
+
+    if experiment_name == "retraining-random":
+        MNLI_retraining_experiments(
+            mode="random")
+
+    if experiment_name == "retraining-KNN-1000":
+        MNLI_retraining_experiments(
+            mode="KNN-1000")
+
+    if experiment_name == "retraining-KNN-10000":
+        MNLI_retraining_experiments(
+            mode="KNN-10000")
 
     if experiment_name == "hans-augmentation":
         hans_augmentation_experiments()
+
+    if experiment_name == "imitator":
+        imitator_experiments()
+
+    # raise ValueError(f"Unknown Experiment Name: {experiment_name}")

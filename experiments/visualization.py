@@ -1,5 +1,5 @@
-import torch
 import numpy as np
+import pandas as pd
 from tqdm import tqdm, trange
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
@@ -7,10 +7,7 @@ from matplotlib.axes._subplots import Subplot
 # from graph_tool.draw import graph_draw
 # from joblib import Parallel, delayed
 
-from typing import List, Dict, Tuple, Optional, Union, Callable
-from influence_utils import faiss_utils
-from influence_utils import parallel
-from influence_utils import nn_influence_utils
+from typing import List, Dict, Tuple, Optional, Union, Callable, Any
 from experiments.visualization_utils import (
     get_circle_coordinates,
     get_within_circle_constraint,
@@ -20,6 +17,7 @@ from experiments.visualization_utils import (
 from experiments import constants
 from experiments import misc_utils
 from experiments import remote_utils
+from experiments import influence_helpers
 from experiments.hans_utils import HansHelper
 from transformers import Trainer, TrainingArguments
 
@@ -44,18 +42,20 @@ DEFAULT_TRAIN_VERTEX_SIZE = 3
 
 
 def main(
+    mode: str,
     train_task_name: str,
     eval_task_name: str,
     num_eval_to_collect: int,
     use_parallel: bool = True,
+    kNN_k: Optional[int] = None,
     hans_heuristic: Optional[str] = None,
     trained_on_task_name: Optional[str] = None,
-) -> List[Dict[int, float]]:
+) -> List[Dict[str, Union[int, Dict[int, float]]]]:
 
-    if train_task_name not in ["mnli-2", "hans"]:
+    if train_task_name not in ["mnli", "mnli-2", "hans"]:
         raise ValueError
 
-    if eval_task_name not in ["mnli-2", "hans"]:
+    if eval_task_name not in ["mnli", "mnli-2", "hans"]:
         raise ValueError
 
     if trained_on_task_name is None:
@@ -65,10 +65,20 @@ def main(
         # influence values will be computed.
         trained_on_task_name = train_task_name
 
-    if trained_on_task_name not in ["mnli-2", "hans"]:
+    if trained_on_task_name not in ["mnli", "mnli-2", "hans"]:
         raise ValueError
 
+    if mode not in ["only-correct", "only-incorrect"]:
+        raise ValueError(f"Unrecognized mode {mode}")
+
+    if kNN_k is None:
+        kNN_k = DEFAULT_KNN_K
+
     # `trained_on_task_name` determines the model to load
+    if trained_on_task_name in ["mnli"]:
+        tokenizer, model = misc_utils.create_tokenizer_and_model(
+            constants.MNLI_MODEL_PATH)
+
     if trained_on_task_name in ["mnli-2"]:
         tokenizer, model = misc_utils.create_tokenizer_and_model(
             constants.MNLI2_MODEL_PATH)
@@ -85,20 +95,9 @@ def main(
         task_name=eval_task_name,
         tokenizer=tokenizer)
 
-    if trained_on_task_name == "mnli-2" and train_task_name == "mnli-2":
-        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
-        faiss_index.load(constants.MNLI2_FAISS_INDEX_PATH)
-    elif trained_on_task_name == "hans" and train_task_name == "hans":
-        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
-        faiss_index.load(constants.HANS_FAISS_INDEX_PATH)
-    elif trained_on_task_name == "mnli-2" and train_task_name == "hans":
-        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
-        faiss_index.load(constants.MNLI2_HANS_FAISS_INDEX_PATH)
-    elif trained_on_task_name == "hans" and train_task_name == "mnli-2":
-        faiss_index = faiss_utils.FAISSIndex(768, "Flat")
-        faiss_index.load(constants.HANS_MNLI2_FAISS_INDEX_PATH)
-    else:
-        faiss_index = None
+    faiss_index = influence_helpers.load_faiss_index(
+        trained_on_task_name=trained_on_task_name,
+        train_task_name=train_task_name)
 
     trainer = Trainer(
         model=model,
@@ -112,7 +111,7 @@ def main(
         eval_dataset=eval_dataset,
     )
 
-    if eval_task_name in ["mnli-2"]:
+    if eval_task_name in ["mnli", "mnli-2"]:
         eval_instance_data_loader = misc_utils.get_dataloader(
             dataset=eval_dataset,
             batch_size=1,
@@ -133,111 +132,60 @@ def main(
             random=False)
 
     # Data-points where the model got wrong
-    wrong_input_collections = []
-    for i, test_inputs in enumerate(eval_instance_data_loader):
+    correct_input_collections = []
+    incorrect_input_collections = []
+    for index, test_inputs in enumerate(eval_instance_data_loader):
         logits, labels, step_eval_loss = misc_utils.predict(
             trainer=trainer,
             model=model,
             inputs=test_inputs)
         if logits.argmax(axis=-1).item() != labels.item():
-            wrong_input_collections.append(test_inputs)
+            incorrect_input_collections.append((index, test_inputs))
+        else:
+            correct_input_collections.append((index, test_inputs))
 
-    params_filter = [
-        n for n, p in model.named_parameters()
-        if not p.requires_grad]
-
-    weight_decay_ignores = [
-        "bias",
-        "LayerNorm.weight"] + [
-        n for n, p in model.named_parameters()
-        if not p.requires_grad]
+    if mode == "only-incorrect":
+        input_collections = incorrect_input_collections
+    else:
+        input_collections = correct_input_collections
 
     # Other settings are not supported as of now
-    if trained_on_task_name == "mnli-2" and eval_task_name == "mnli-2":
-        s_test_damp = 5e-3
-        s_test_scale = 1e4
-        s_test_num_samples = 1000
-
-    if trained_on_task_name == "hans" and eval_task_name == "hans":
-        s_test_damp = 5e-3
-        s_test_scale = 1e6
-        s_test_num_samples = 2000
-
-    if trained_on_task_name == "mnli-2" and eval_task_name == "hans":
-        s_test_damp = 5e-3
-        s_test_scale = 1e6
-        s_test_num_samples = 1000
-
-    if trained_on_task_name == "hans" and eval_task_name == "mnli-2":
-        s_test_damp = 5e-3
-        s_test_scale = 1e6
-        s_test_num_samples = 2000
+    (s_test_damp,
+     s_test_scale,
+     s_test_num_samples) = influence_helpers.select_s_test_config(
+        trained_on_task_name=trained_on_task_name,
+        train_task_name=train_task_name,
+        eval_task_name=eval_task_name)
 
     influences_collections = []
-    for index, inputs in enumerate(wrong_input_collections[:num_eval_to_collect]):
+    for index, inputs in input_collections[:num_eval_to_collect]:
         print(f"#{index}")
-        if faiss_index is not None:
-            features = misc_utils.compute_BERT_CLS_feature(model, **inputs)
-            features = features.cpu().detach().numpy()
-            KNN_distances, KNN_indices = faiss_index.search(
-                k=DEFAULT_KNN_K, queries=features)
-        else:
-            KNN_indices = None
+        influences = influence_helpers.compute_influences_simplified(
+            k=kNN_k,
+            faiss_index=faiss_index,
+            model=model,
+            inputs=inputs,
+            train_dataset=train_dataset,
+            use_parallel=use_parallel,
+            s_test_damp=s_test_damp,
+            s_test_scale=s_test_scale,
+            s_test_num_samples=s_test_num_samples,
+            device_ids=[0, 1, 2, 3],
+            precomputed_s_test=None)
 
-        if not use_parallel:
-            model.cuda()
-            batch_train_data_loader = misc_utils.get_dataloader(
-                train_dataset,
-                batch_size=1,
-                random=True)
-
-            instance_train_data_loader = misc_utils.get_dataloader(
-                train_dataset,
-                batch_size=1,
-                random=False)
-
-            influences, _, _ = nn_influence_utils.compute_influences(
-                n_gpu=1,
-                device=torch.device("cuda"),
-                batch_train_data_loader=batch_train_data_loader,
-                instance_train_data_loader=instance_train_data_loader,
-                model=model,
-                test_inputs=inputs,
-                params_filter=params_filter,
-                weight_decay=constants.WEIGHT_DECAY,
-                weight_decay_ignores=weight_decay_ignores,
-                s_test_damp=s_test_damp,
-                s_test_scale=s_test_scale,
-                s_test_num_samples=s_test_num_samples,
-                train_indices_to_include=KNN_indices,
-                precomputed_s_test=None)
-        else:
-            influences, _ = parallel.compute_influences_parallel(
-                # Avoid clash with main process
-                device_ids=[0, 1, 2, 3],
-                train_dataset=train_dataset,
-                batch_size=1,
-                model=model,
-                test_inputs=inputs,
-                params_filter=params_filter,
-                weight_decay=constants.WEIGHT_DECAY,
-                weight_decay_ignores=weight_decay_ignores,
-                s_test_damp=s_test_damp,
-                s_test_scale=s_test_scale,
-                s_test_num_samples=s_test_num_samples,
-                train_indices_to_include=KNN_indices,
-                return_s_test=False,
-                debug=False)
-
-        influences_collections.append(influences)
+        influences_collections.append({
+            "index": index,
+            "influences": influences,
+        })
 
     remote_utils.save_and_mirror_scp_to_remote(
         object_to_save=influences_collections,
         file_name=(
-            f"visualization.{num_eval_to_collect}"
+            f"visualization"
+            f".{mode}.{num_eval_to_collect}"
             f".{train_task_name}-{eval_task_name}"
             f"-{hans_heuristic}-{trained_on_task_name}"
-            f".{use_parallel}.pth"))
+            f".{kNN_k}.{use_parallel}.pth"))
 
     return influences_collections
 
@@ -245,11 +193,13 @@ def main(
 def run_experiments(option: str) -> List[List[Dict[int, float]]]:
     if option == "mnli2_and_hans":
         mnli2_influences = main(
+            mode="only-incorrect",
             train_task_name="mnli-2",
             eval_task_name="mnli-2",
             num_eval_to_collect=100)
 
         hans_influences = main(
+            mode="only-incorrect",
             train_task_name="mnli-2",
             eval_task_name="hans",
             num_eval_to_collect=100)
@@ -260,6 +210,7 @@ def run_experiments(option: str) -> List[List[Dict[int, float]]]:
         hans_influences_collections = []
         for hans_heuristic in ["lexical_overlap", "subsequence", "constituent"]:
             hans_influences = main(
+                mode="only-incorrect",
                 train_task_name="mnli-2",
                 eval_task_name="hans",
                 num_eval_to_collect=100,
@@ -273,6 +224,7 @@ def run_experiments(option: str) -> List[List[Dict[int, float]]]:
         hans_influences_collections = []
         for hans_heuristic in ["lexical_overlap", "subsequence", "constituent"]:
             hans_influences = main(
+                mode="only-incorrect",
                 train_task_name="hans",
                 eval_task_name="hans",
                 num_eval_to_collect=100,
@@ -643,3 +595,52 @@ def plot_Xs_and_Ys_dict(
 
     if output_file_name is not None:
         plt.savefig(output_file_name)
+
+
+def collect_edges_from_graph(
+        g: gt.Graph,
+        vertex_color_to_slice_map: Dict[int, str]
+) -> Tuple[pd.DataFrame, List[Dict[str, Any]]]:
+
+    edge_collections = []
+    edge_to_color_map = g.vertex_properties["colors"]
+    edge_to_data_index_map = g.vertex_properties["data_indices"]
+    for edge in tqdm(g.edges()):
+        source_vertex = edge.source()
+        target_vertex = edge.target()
+        source_vertex_color = edge_to_color_map[source_vertex]
+        target_vertex_color = edge_to_color_map[target_vertex]
+        source_vertex_data_index = edge_to_data_index_map[source_vertex]
+        target_vertex_data_index = edge_to_data_index_map[target_vertex]
+
+        # source vertex should be training data
+        if not source_vertex_data_index.startswith("train"):
+            raise ValueError
+
+        # target vertex should be evaluation data
+        if not target_vertex_data_index.startswith("eval"):
+            raise ValueError
+
+        # train vertex should have this color
+        if source_vertex_color != DEFAULT_TRAIN_VERTEX_COLOR:
+            raise ValueError
+
+        # eval vertex should not have this color
+        if target_vertex_color == DEFAULT_TRAIN_VERTEX_COLOR:
+            raise ValueError
+
+        edge_collection = {
+            "edge": edge,
+            "target_slice": vertex_color_to_slice_map[target_vertex_color],
+            "source_vertex_data_index": source_vertex_data_index,
+            "target_vertex_data_index": target_vertex_data_index,
+        }
+
+        for property_name, property_map in g.edge_properties.items():
+            if property_name in edge_collection.keys():
+                raise ValueError(f"Duplicate key {property_name}")
+            edge_collection[property_name] = property_map[edge]
+
+        edge_collections.append(edge_collection)
+
+    return pd.DataFrame(edge_collections), edge_collections

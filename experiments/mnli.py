@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import transformers
 from tqdm import tqdm
+from glob import glob
 from copy import deepcopy
 from contexttimer import Timer
 from collections import defaultdict
@@ -17,14 +18,32 @@ from experiments import constants
 from experiments import mnli_utils
 from experiments import misc_utils
 from experiments import remote_utils
-from influence_utils import faiss_utils
+from experiments import influence_helpers
+from experiments import hans
 from influence_utils import nn_influence_utils
 from experiments.data_utils import (
     glue_output_modes,
     glue_compute_metrics)
 
 MNLI_TRAINING_SCRIPT_NAME = "scripts/run_MNLI.20200913.sh"
-NUM_DATAPOINTS_TO_REMOVE_CHOICES = [1, 100, 10000]
+NUM_DATAPOINTS_TO_REMOVE_CHOICES = [1, 5, 25]
+
+CORRECT_INDICES = sorted([
+    # e.g., `KNN-recall.only-correct.50.0.pth.g0301.ll.unc.edu`
+    int(f.split("/")[-1].split(".")[3])
+    for f in glob(os.path.join(
+        constants.MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR,
+        "*only-correct*")
+    )
+])
+INCORRECT_INDICES = sorted([
+    # e.g., `KNN-recall.only-correct.50.0.pth.g0301.ll.unc.edu`
+    int(f.split("/")[-1].split(".")[3])
+    for f in glob(os.path.join(
+        constants.MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR,
+        "*only-incorrect*")
+    )
+])
 
 
 def run_retraining_main(
@@ -34,21 +53,59 @@ def run_retraining_main(
     if mode not in ["full", "KNN-1000", "KNN-10000", "random"]:
         raise ValueError(f"Unrecognized `mode` {mode}")
 
-    for example_index in range(num_examples_to_test):
+    for example_relative_index in range(num_examples_to_test):
         for correct_mode in ["correct", "incorrect"]:
-            if mode in ["full", "KNN-1000", "KNN-10000"]:
+            if correct_mode == "correct":
+                example_index = CORRECT_INDICES[example_relative_index]
+            if correct_mode == "incorrect":
+                example_index = INCORRECT_INDICES[example_relative_index]
+
+            if mode in ["full"]:
                 # Load file from local or sync from remote
-                if mode == "full":
-                    file_name = os.path.join(
-                        constants.MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR,
-                        f"KNN-recall.only-{correct_mode}.50.{example_index}"
-                        f".pth.sfr-pod-nazneen-rajani")
-                influences_dict = remote_utils.load_file_from_local_or_remote(
-                    local_file_name=file_name,
-                    remote_file_name=file_name)
-                helpful_indices = misc_utils.sort_dict_keys_by_vals(
-                    influences_dict["influences"])
-                harmful_indices = helpful_indices[::-1]
+                file_name = os.path.join(
+                    constants.MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR,
+                    f"KNN-recall.only-{correct_mode}.50.{example_index}"
+                    f".pth.g0301.ll.unc.edu")
+
+                influences_dict = torch.load(file_name)
+                if example_index != influences_dict["test_index"]:
+                    raise ValueError
+
+                if (correct_mode == "correct" and
+                        influences_dict["correct"] is not True or
+                        correct_mode == "incorrect" and
+                        influences_dict["correct"] is True):
+                    raise ValueError
+
+                helpful_indices, harmful_indices = (
+                    misc_utils.get_helpful_harmful_indices_from_influences_dict(
+                        influences_dict["influences"]))
+
+                indices_dict = {
+                    "helpful": helpful_indices,
+                    "harmful": harmful_indices}
+
+            if mode in ["KNN-1000", "KNN-10000"]:
+                if mode == "KNN-1000":
+                    kNN_k = 1000
+                if mode == "KNN-10000":
+                    kNN_k = 10000
+
+                file_name = os.path.join(
+                    constants.MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR2,
+                    f"visualization"
+                    f".only-{correct_mode}"
+                    f".5.mnli-mnli-None-mnli"
+                    f".{kNN_k}.True.pth.g0306.ll.unc.edu")
+
+                influences_dict = torch.load(file_name)[example_relative_index]
+                if example_index != influences_dict["index"]:
+                    raise ValueError
+
+                helpful_indices, harmful_indices = (
+                    misc_utils.get_helpful_harmful_indices_from_influences_dict(
+                        influences_dict["influences"]))
+
                 indices_dict = {
                     "helpful": helpful_indices,
                     "harmful": harmful_indices}
@@ -56,6 +113,9 @@ def run_retraining_main(
             if mode == "random":
                 # Get indices corresponding to each label
                 label_to_indices = mnli_utils.get_label_to_indices_map()
+                np.random.shuffle(label_to_indices["neutral"])
+                np.random.shuffle(label_to_indices["entailment"])
+                np.random.shuffle(label_to_indices["contradiction"])
                 indices_dict = {
                     "neutral": label_to_indices["neutral"],
                     "entailment": label_to_indices["entailment"],
@@ -64,6 +124,10 @@ def run_retraining_main(
 
             for tag, indices in indices_dict.items():
                 for num_data_points_to_remove in NUM_DATAPOINTS_TO_REMOVE_CHOICES:
+                    if len(indices) < num_data_points_to_remove:
+                        raise ValueError(f"`indices` have only {len(indices)} elememts "
+                                         f"whereas {num_data_points_to_remove} is needed")
+
                     run_one_retraining(
                         indices=indices[:num_data_points_to_remove],
                         dir_name=(
@@ -88,14 +152,14 @@ def run_one_retraining(
         MNLI_TRAINING_SCRIPT_NAME,
         dir_name, output_dir
     ])
-    client = remote_utils.ScpClient()
-    client.scp_file_to_remote(
-        local_file_name=dir_name,
-        remote_file_name=os.path.join(
-            constants.REMOTE_DEFAULT_REMOTE_BASE_DIR,
-            f"{dir_name}.{client.host_name}"),
-        # This is a folder
-        recursive=True)
+    # client = remote_utils.ScpClient()
+    # client.scp_file_to_remote(
+    #     local_file_name=dir_name,
+    #     remote_file_name=os.path.join(
+    #         constants.REMOTE_DEFAULT_REMOTE_BASE_DIR,
+    #         f"{dir_name}.{client.host_name}"),
+    #     # This is a folder
+    #     recursive=True)
 
 
 def run_full_influence_functions(
@@ -208,6 +272,7 @@ def run_full_influence_functions(
                 precomputed_s_test=None)
 
             outputs = {
+                "test_index": test_index,
                 "influences": influences,
                 "s_test": s_test,
                 "time": timer.elapsed,
@@ -224,158 +289,165 @@ def run_full_influence_functions(
     return outputs_collections
 
 
-def get_influences(
-        k: int,
-        model: torch.nn.Module,
-        test_inputs: Dict[str, torch.Tensor],
-        batch_train_data_loader: torch.utils.data.DataLoader,
-        instance_train_data_loader: torch.utils.data.DataLoader,
-        device_ids: Optional[List[int]] = None,
-        precomputed_s_test: Optional[List[torch.FloatTensor]] = None,
-) -> Tuple[Dict[int, float], List[torch.FloatTensor]]:
+def imitator_main(mode: str, num_examples_to_test: int) -> List[Dict[str, Any]]:
+    if mode not in ["only-correct", "only-incorrect"]:
+        raise ValueError(f"Unrecognized mode {mode}")
 
-    faiss_index = faiss_utils.FAISSIndex(768, "Flat")
-    faiss_index.load(constants.MNLI_FAISS_INDEX_PATH)
-    print(f"Loaded FAISS index with {len(faiss_index)} entries")
+    task_tokenizer, task_model = misc_utils.create_tokenizer_and_model(
+        constants.MNLI_MODEL_PATH)
 
-    test_features = misc_utils.compute_BERT_CLS_feature(model, **test_inputs)
-    test_features = test_features.cpu().detach().numpy()
-    KNN_distances, KNN_indices = faiss_index.search(
-        k=k, queries=test_features)
+    imitator_tokenizer, imitator_model = misc_utils.create_tokenizer_and_model(
+        constants.MNLI_IMITATOR_MODEL_PATH)
 
-    # Make sure indices are sorted according to distances
-    # KNN_distances[(
-    #     KNN_indices.squeeze(axis=0)[
-    #         np.argsort(KNN_distances.squeeze(axis=0))
-    #     ] != KNN_indices)]
+    (mnli_train_dataset,
+     mnli_eval_dataset) = misc_utils.create_datasets(
+        task_name="mnli",
+        tokenizer=task_tokenizer)
 
-    params_filter = [
-        n for n, p in model.named_parameters()
-        if not p.requires_grad]
+    task_model.cuda()
+    imitator_model.cuda()
+    if task_model.training is True or imitator_model.training is True:
+        raise ValueError("One of the model is in training mode")
+    print(task_model.device, imitator_model.device)
 
-    weight_decay_ignores = [
-        "bias",
-        "LayerNorm.weight"] + [
-        n for n, p in model.named_parameters()
-        if not p.requires_grad]
+    # Most of these arguments are placeholders
+    # and are not really used at all, so ignore
+    # the exact values of these.
+    trainer = transformers.Trainer(
+        model=task_model,
+        args=TrainingArguments(
+            output_dir="./tmp-output",
+            per_device_train_batch_size=128,
+            per_device_eval_batch_size=128,
+            learning_rate=5e-5,
+            logging_steps=100),
+    )
 
-    if device_ids is None:
-        (influences,
-         train_inputs_collections,
-         s_test) = nn_influence_utils.compute_influences(
-            n_gpu=1,
-            device=torch.device("cuda"),
-            model=model,
-            test_inputs=test_inputs,
-            batch_train_data_loader=batch_train_data_loader,
-            instance_train_data_loader=instance_train_data_loader,
-            params_filter=params_filter,
-            weight_decay=constants.WEIGHT_DECAY,
-            weight_decay_ignores=weight_decay_ignores,
-            s_test_scale=1000,
-            s_test_num_samples=300,
-            precomputed_s_test=precomputed_s_test,
-            train_indices_to_include=KNN_indices)
-    else:
-        raise ValueError("Deprecated")
-
-    return influences, s_test
-
-
-def main(
-    label_list: List[str],
-    task_model: torch.nn.Module,
-    imitator_model: torch.nn.Module,
-    trainer: transformers.Trainer,
-    test_data_point_indices: List[int],
-    batch_train_data_loader: torch.utils.data.DataLoader,
-    instance_train_data_loader: torch.utils.data.DataLoader,
-    instance_eval_data_loader: torch.utils.data.DataLoader,
-    sample_size: int = 10,
-    num_nearest_neighbors: int = 10000,
-    finetune_using_ground_truth_label: bool = False
-) -> List[Dict[str, Any]]:
+    eval_instance_data_loader = misc_utils.get_dataloader(
+        mnli_eval_dataset,
+        batch_size=1,
+        data_collator=default_data_collator)
 
     train_inputs_collections = torch.load(
         constants.MNLI_TRAIN_INPUT_COLLECTIONS_PATH)
 
-    neutral_examples = []
-    entailment_examples = []
-    contradiction_examples = []
+    inputs_by_label: Dict[str, List[int]] = defaultdict(list)
     for i in range(len(train_inputs_collections)):
-        label = label_list[train_inputs_collections[i]["labels"]]
-        if label == "neutral":
-            neutral_examples.append(i)
-        if label == "entailment":
-            entailment_examples.append(i)
-        if label == "contradiction":
-            contradiction_examples.append(i)
+        label = mnli_train_dataset.label_list[
+            train_inputs_collections[i]["labels"]]
+        inputs_by_label[label].append(i)
 
     outputs_collections = []
-    for i, test_inputs in enumerate(instance_eval_data_loader):
-        if i not in test_data_point_indices:
+    for i, test_inputs in enumerate(eval_instance_data_loader):
+        if mode == "only-correct" and i not in CORRECT_INDICES[:num_examples_to_test]:
+            continue
+        if mode == "only-incorrect" and i not in INCORRECT_INDICES[:num_examples_to_test]:
             continue
 
         start_time = time.time()
-        imitator_test_inputs = experimental_make_imitator_inputs(
-            trainer=trainer, task_model=task_model, inputs=test_inputs)
-        # if labels[0] != logits.argmax(axis=1)[0]:
-        #     break
-        influences, _ = get_influences(
-            k=num_nearest_neighbors,
-            model=task_model,
-            test_inputs=test_inputs,
-            batch_train_data_loader=batch_train_data_loader,
-            instance_train_data_loader=instance_train_data_loader)
-
-        data_indices = (
-            np.random.choice(neutral_examples,
-                             size=sample_size,
-                             replace=False).tolist() +  # noqa
-            np.random.choice(entailment_examples,
-                             size=sample_size,
-                             replace=False).tolist() +  # noqa
-            np.random.choice(contradiction_examples,
-                             size=sample_size,
-                             replace=False).tolist() +  # noqa
-            misc_utils.sort_dict_keys_by_vals(influences)[:sample_size] +  # noqa
-            misc_utils.sort_dict_keys_by_vals(influences)[-sample_size:]
-        )
-
-        data_tags = (
-            ["random-neutral" for _ in range(sample_size)] +  # noqa
-            ["random-entailment" for _ in range(sample_size)] +  # noqa
-            ["random-contradiction" for _ in range(sample_size)] +  # noqa
-            ["most-negative-influential" for _ in range(sample_size)] +  # noqa
-            ["most-positive-influential" for _ in range(sample_size)]
-        )
-
-        learning_rates = np.logspace(-5, -2.5, 50)
-        losses = compute_new_imitator_losses(
-            trainer=trainer,
-            tags=data_tags,
-            indices=data_indices,
-            task_model=task_model,
-            imitator_model=imitator_model,
-            learning_rates=learning_rates,
-            imitator_test_inputs=imitator_test_inputs,
-            train_inputs_collections=train_inputs_collections,
-            finetune_using_ground_truth_label=finetune_using_ground_truth_label)
-
-        outputs_collections.append({
-            "index": i,
-            "losses": losses,
-            "influences": influences,
-            "test_inputs": test_inputs,
-            "learning_rates": learning_rates,
-            "imitator_test_inputs": imitator_test_inputs
-        })
+        for using_ground_truth in [True, False]:
+            outputs = run_one_imitator_experiment(
+                task_model=task_model,
+                imitator_model=imitator_model,
+                test_inputs=test_inputs,
+                trainer=trainer,
+                train_dataset=mnli_train_dataset,
+                train_inputs_collections=train_inputs_collections,
+                inputs_by_label=inputs_by_label,
+                finetune_using_ground_truth_label=using_ground_truth)
+            outputs["index"] = i
+            outputs_collections.append(outputs)
 
         end_time = time.time()
         print(f"#{len(outputs_collections)}/{len(outputs_collections)}: "
               f"Elapsed {(end_time - start_time) / 60:.2f}")
 
+    torch.save(
+        outputs_collections,
+        f"imiator_experiments.{mode}.{num_examples_to_test}.pt")
+
     return outputs_collections
+
+
+def run_one_imitator_experiment(
+    task_model: torch.nn.Module,
+    imitator_model: torch.nn.Module,
+    test_inputs,
+    trainer: transformers.Trainer,
+    train_dataset: torch.utils.data.Dataset,
+    train_inputs_collections: List,
+    inputs_by_label: Dict[str, List[int]],
+    sample_size: int = 10,
+    num_nearest_neighbors: int = 10000,
+    finetune_using_ground_truth_label: bool = False
+) -> Dict[str, Any]:
+
+    imitator_test_inputs = _make_imitator_inputs(
+        trainer=trainer, task_model=task_model, inputs=test_inputs)
+    # if labels[0] != logits.argmax(axis=1)[0]:
+    #     break
+    faiss_index = influence_helpers.load_faiss_index(
+        trained_on_task_name="mnli",
+        train_task_name="mnli")
+
+    s_test_damp, s_test_scale, s_test_num_samples = influence_helpers.select_s_test_config(
+        trained_on_task_name="mnli",
+        train_task_name="mnli",
+        eval_task_name="mnli")
+
+    influences = influence_helpers.compute_influences_simplified(
+        k=num_nearest_neighbors,
+        faiss_index=faiss_index,
+        model=task_model,
+        inputs=test_inputs,
+        train_dataset=train_dataset,
+        use_parallel=False,
+        s_test_damp=s_test_damp,
+        s_test_scale=s_test_scale,
+        s_test_num_samples=s_test_num_samples)
+
+    data_indices = (
+        np.random.choice(inputs_by_label["neutral"],
+                         size=sample_size,
+                         replace=False).tolist() +  # noqa
+        np.random.choice(inputs_by_label["entailment"],
+                         size=sample_size,
+                         replace=False).tolist() +  # noqa
+        np.random.choice(inputs_by_label["contradiction"],
+                         size=sample_size,
+                         replace=False).tolist() +  # noqa
+        misc_utils.sort_dict_keys_by_vals(influences)[:sample_size] +  # noqa
+        misc_utils.sort_dict_keys_by_vals(influences)[-sample_size:]
+    )
+
+    data_tags = (
+        ["random-neutral" for _ in range(sample_size)] +  # noqa
+        ["random-entailment" for _ in range(sample_size)] +  # noqa
+        ["random-contradiction" for _ in range(sample_size)] +  # noqa
+        ["most-negative-influential" for _ in range(sample_size)] +  # noqa
+        ["most-positive-influential" for _ in range(sample_size)]
+    )
+
+    learning_rates = np.logspace(-5, -2.5, 50)
+    losses = compute_new_imitator_losses(
+        trainer=trainer,
+        tags=data_tags,
+        indices=data_indices,
+        task_model=task_model,
+        imitator_model=imitator_model,
+        learning_rates=learning_rates,
+        imitator_test_inputs=imitator_test_inputs,
+        train_inputs_collections=train_inputs_collections,
+        finetune_using_ground_truth_label=finetune_using_ground_truth_label)
+
+    return {
+        "losses": losses,
+        "influences": influences,
+        "test_inputs": test_inputs,
+        "learning_rates": learning_rates,
+        "imitator_test_inputs": imitator_test_inputs,
+        "finetune_using_ground_truth_label": finetune_using_ground_truth_label,
+    }
 
 
 def compute_new_imitator_losses(
@@ -400,50 +472,27 @@ def compute_new_imitator_losses(
         n for n, p in imitator_model.named_parameters()
         if not p.requires_grad]
 
-    params_to_freeze = [
-        "bert.embeddings.",
-        "bert.encoder.layer.0.",
-        "bert.encoder.layer.1.",
-        "bert.encoder.layer.2.",
-        "bert.encoder.layer.3.",
-        "bert.encoder.layer.4.",
-        "bert.encoder.layer.5.",
-        "bert.encoder.layer.6.",
-        "bert.encoder.layer.7.",
-        "bert.encoder.layer.8.",
-        "bert.encoder.layer.9.",
-    ]
-
     losses = defaultdict(list)
     for index, tag in zip(tqdm(indices), tags):
         if finetune_using_ground_truth_label is True:
             imitator_train_inputs = train_inputs_collections[index]
         else:
-            imitator_train_inputs = experimental_make_imitator_inputs(
+            imitator_train_inputs = _make_imitator_inputs(
                 trainer=trainer,
                 task_model=task_model,
                 inputs=train_inputs_collections[index])
 
-        helpful_grad_z = nn_influence_utils.compute_gradients(
-            n_gpu=1,
-            device=torch.device("cuda"),
-            model=imitator_model,
-            inputs=imitator_train_inputs,
-            params_filter=params_filter,
-            weight_decay=constants.WEIGHT_DECAY,
-            weight_decay_ignores=weight_decay_ignores)
-
         _losses = []
+        gradients_z = None
         for lr in learning_rates:
-            new_imitator_model = deepcopy(imitator_model)
-            params_to_update = [
-                p for name, p in new_imitator_model.named_parameters()
-                if not any(pfreeze in name for pfreeze in params_to_freeze)]
-
-            with torch.no_grad():
-                [p.sub_(lr * grad_z) for p, grad_z in
-                 zip(params_to_update, helpful_grad_z)]
-
+            # Re-use `gradients_z`
+            new_imitator_model, gradients_z = hans.pseudo_gradient_step(
+                model=imitator_model,
+                inputs=imitator_train_inputs,
+                learning_rate=lr,
+                params_filter=params_filter,
+                weight_decay_ignores=weight_decay_ignores,
+                precomputed_gradients_z=gradients_z)
             _, _, imitator_loss = misc_utils.predict(
                 trainer=trainer,
                 model=new_imitator_model,
@@ -455,7 +504,7 @@ def compute_new_imitator_losses(
     return losses
 
 
-def experimental_make_imitator_inputs(
+def _make_imitator_inputs(
         trainer: transformers.Trainer,
         task_model: torch.nn.Module,
         inputs: Dict[str, torch.Tensor],

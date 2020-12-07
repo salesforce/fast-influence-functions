@@ -7,6 +7,7 @@ WEIGHT_DECAY = 0.005
 MNLI_MODEL_PATH = "/export/home/hguo/Experiments/20200706/"
 HANS_MODEL_PATH = "/export/home/hguo/Experiments/20200907/"
 MNLI2_MODEL_PATH = "/export/home/hguo/Experiments/20200801/"
+MNLI_IMITATOR_MODEL_PATH = "/export/home/hguo/Experiments/20200718/output_dir/"
 
 # Trained and used in MNLI
 MNLI_FAISS_INDEX_PATH = "/export/home/hguo/Experiments/20200713/MNLI.index"
@@ -40,7 +41,8 @@ REMOTE_DEFAULT_SSH_KEY_FILENAME = "./cluster/salesforce-intern-project.pem"
 REMOTE_DEFAULT_REMOTE_BASE_DIR = os.getenv("REMOTE_BASE_DIR")
 
 # Experiments specific
-MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR = "/export/home/hguo/Experiments/20200904/"
+MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR = "/export/home/hguo/Experiments/20200922/"
+MNLI_RETRAINING_INFLUENCE_OUTPUT_BASE_DIR2 = "/export/home/hguo/Experiments-backup/20201019/visualization_outputs/"
 
 # Some useful default hparams for influence functions
 DEFAULT_INFLUENCE_HPARAMS = {

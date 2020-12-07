@@ -4,7 +4,7 @@ import numpy as np
 # from tqdm import tqdm
 from torch.utils.data.dataloader import DataLoader
 from torch.utils.data.sampler import SequentialSampler, RandomSampler
-from typing import Tuple, Optional, Union, Any, Dict, List
+from typing import Tuple, Optional, Union, Any, Dict, List, Callable
 from transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
@@ -24,6 +24,46 @@ def sort_dict_keys_by_vals(d: Dict[int, float]) -> List[int]:
     sorted_items = sorted(list(d.items()),
                           key=lambda pair: pair[1])
     return [pair[0] for pair in sorted_items]
+
+
+def sort_dict_keys_by_vals_with_conditions(
+        d: Dict[int, float],
+        condition_func: Callable[[Tuple[int, float]], bool]
+) -> List[int]:
+
+    sorted_items = sorted(list(d.items()),
+                          key=lambda pair: pair[1])
+    return [pair[0] for pair in sorted_items
+            if condition_func(pair)]
+
+
+def get_helpful_harmful_indices_from_influences_dict(
+        d: Dict[int, float],
+        n: Optional[int] = None,
+) -> Tuple[List[int], List[int]]:
+
+    helpful_indices = sort_dict_keys_by_vals_with_conditions(
+        d, condition_func=lambda k_v: k_v[1] < 0.0)
+    harmful_indices = sort_dict_keys_by_vals_with_conditions(
+        d, condition_func=lambda k_v: k_v[1] > 0.0)[::-1]
+
+    if n is not None:
+        if len(helpful_indices) < n:
+            raise ValueError(
+                f"`helpful_indices` have only "
+                f"{len(helpful_indices)} elememts "
+                f"whereas {n} is needed")
+
+        if len(harmful_indices) < n:
+            raise ValueError(
+                f"`harmful_indices` have only "
+                f"{len(harmful_indices)} elememts "
+                f"whereas {n} is needed")
+
+        helpful_indices = helpful_indices[:n]
+        harmful_indices = harmful_indices[:n]
+
+    return helpful_indices, harmful_indices
 
 
 def compute_BERT_CLS_feature(
@@ -191,7 +231,7 @@ def is_prediction_correct(
     if preds.shape[0] != 1:
         raise ValueError("This function only works on instances.")
 
-    return (preds.argmax(axis=-1) == label_ids).all()
+    return bool((preds.argmax(axis=-1) == label_ids).all())
 
 
 def move_inputs_to_device(

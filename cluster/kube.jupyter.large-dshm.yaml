@@ -32,8 +32,9 @@ spec:
           mountPath: "/export/home"
         - name: sfr-share-pv-hguo
           mountPath: "/export/share"
-        - mountPath: /dev/shm
-          name: dshm
+        - name: dshm
+          mountPath: "/dev/shm"
+
   tolerations:
   - key: "gpu_num"
     operator: "Equal"

@@ -35,6 +35,10 @@ git checkout -- cluster/slurm.interactive.sh  # this is important
 sed -i -e 's@IMAGE_TAG@'"$HeadCommitSHA"'@' cluster/slurm.interactive.sh
 
 # Modify the tag in the related files
+git checkout -- cluster/slurm.interactive.small.sh  # this is important
+sed -i -e 's@IMAGE_TAG@'"$HeadCommitSHA"'@' cluster/slurm.interactive.small.sh
+
+# Modify the tag in the related files
 git checkout -- cluster/kube.jupyter.yaml  # this is important
 sed -i -e 's@IMAGE_TAG@'"$HeadCommitSHA"'@' cluster/kube.jupyter.yaml
 
@@ -51,5 +55,5 @@ git checkout -- cluster/kube.jupyter.large-dshm.yaml  # this is important
 sed -i -e 's@IMAGE_TAG@'"$HeadCommitSHA"'@' cluster/kube.jupyter.large-dshm.yaml
 
 # Modify the tag in the related files
-git checkout -- cluster/kube.jupyter.large-dshm.external.yaml  # this is important
-sed -i -e 's@IMAGE_TAG@'"$HeadCommitSHA"'@' cluster/kube.jupyter.large-dshm.external.yaml
+git checkout -- cluster/kube.jupyter.large.external.yaml  # this is important
+sed -i -e 's@IMAGE_TAG@'"$HeadCommitSHA"'@' cluster/kube.jupyter.large.external.yaml
