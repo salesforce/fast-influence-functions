@@ -50,6 +50,13 @@ Switching gear towards downstream tasks
 * Added `graph_tool` to `Dockerfile.external`
 * Support non-parallel settings in experiments.
 * Added retraining experiments.
+* Added public README.
+* Added a new version of `experiments/hans.py`.
+* Added `experiments/influence_helpers.py` for simplifying some codes.
+* Make sure the return type is `bool` in `experiments/misc_utils.py:is_prediction_correct`.
+* Added functions for returing helpful/harmful indices in `experiments/misc_utils.py` that also checks the number of negative/positive indices.
+* Major cleanup and resign of `experiments/mnli.py`.
+* Added a few notebooks.
 
 
 ### Minor Changes
@@ -63,4 +70,8 @@ Switching gear towards downstream tasks
 * Added a few more constants to `experiments/constants.py`
 * Improved flexibility of the demo and visualization.
 * Fix the bug on `np.bool_(True) is True => False`
+* Minor changes to cluster scripts.
+* Added function for helping results analysis in `experiments/visualization.py`.
+* Added the option to specify x-range in `experiments/visualization_utils.py:plot_influences_distribution`.
+* Removed the deprecated `influence_utils/nn_influence_utils.py:experimental_clip_gradient_norm_`.
 
