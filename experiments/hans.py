@@ -4,6 +4,7 @@ import transformers
 from tqdm import tqdm
 from copy import deepcopy
 from collections import defaultdict
+from transformers import InputFeatures
 from transformers import default_data_collator
 from typing import Union, Dict, Any, List, Tuple, Optional
 
@@ -200,9 +201,11 @@ def one_experiment(
     s_test_scale: float,
     s_test_num_samples: int,
     trainer: transformers.Trainer,
+    version: str,
     version_2_num_datapoints: Optional[int],
     version_2_learning_rate: Optional[float],
     hans_eval_heuristic_inputs: Dict[str, Any],
+    hans_eval_heuristic_raw_inputs: List[InputFeatures],
 ) -> Tuple[Dict[str, Any], Optional[torch.nn.Module]]:
     if task_model.device.type != "cuda":
         raise ValueError("The model is supposed to be on CUDA")
@@ -255,9 +258,20 @@ def one_experiment(
     num_datapoints = version_2_num_datapoints
     learning_rate = version_2_learning_rate
 
-    datapoints = [
-        train_dataset[index]
-        for index in datapoint_indices[:num_datapoints]]
+    if version == "new-only-z":
+        datapoints = [
+            train_dataset[index]
+            for index in datapoint_indices[:num_datapoints]]
+
+    if version == "new-only-ztest":
+        datapoints = hans_eval_heuristic_raw_inputs
+
+    if version == "new-z-and-ztest":
+        datapoints = [
+            train_dataset[index]
+            for index in datapoint_indices[:num_datapoints]
+        ] + hans_eval_heuristic_raw_inputs
+
     batch = default_data_collator(datapoints)
     new_model, _ = pseudo_gradient_step(
         model=task_model,
