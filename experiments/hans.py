@@ -46,10 +46,7 @@ def main(
     if num_replicas is None:
         num_replicas = DEFAULT_NUM_REPLICAS
 
-    if version is None:
-        version = "new"
-
-    if version not in ["old", "new"]:
+    if version not in ["new-only-z", "new-only-ztest", "new-z-and-ztest"]:
         raise ValueError
 
     task_tokenizer, task_model = misc_utils.create_tokenizer_and_model(
@@ -134,8 +131,9 @@ def main(
             for experiment_type in EXPERIMENT_TYPES:
                 for replica_index in range(num_replicas):
 
-                    hans_eval_heuristic_inputs = hans_helper.sample_batch_of_heuristic(
-                        mode="eval", heuristic=train_heuristic, size=128)
+                    (hans_eval_heuristic_inputs,
+                     hans_eval_heuristic_raw_inputs) = hans_helper.sample_batch_of_heuristic(
+                        mode="eval", heuristic=train_heuristic, size=128, return_raw_data=True)
 
                     misc_utils.move_inputs_to_device(
                         inputs=hans_eval_heuristic_inputs,
@@ -161,9 +159,11 @@ def main(
                                     s_test_scale=s_test_scale,
                                     s_test_num_samples=s_test_num_samples,
                                     trainer=trainer,
+                                    version=version,
                                     version_2_num_datapoints=version_2_num_datapoints,
                                     version_2_learning_rate=version_2_learning_rate,
                                     hans_eval_heuristic_inputs=hans_eval_heuristic_inputs,
+                                    hans_eval_heuristic_raw_inputs=hans_eval_heuristic_raw_inputs,
                                 )
 
                                 output_collections[
