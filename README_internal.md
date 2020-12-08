@@ -75,3 +75,6 @@ Switching gear towards downstream tasks
 * Added the option to specify x-range in `experiments/visualization_utils.py:plot_influences_distribution`.
 * Removed the deprecated `influence_utils/nn_influence_utils.py:experimental_clip_gradient_norm_`.
 
+# 0.5
+### Major Changes
+* Updated `experiments/hans.py` to new experiment-designs.
