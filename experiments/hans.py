@@ -133,6 +133,14 @@ def main(
         with tqdm(total=num_total_experiments) as pbar:
             for experiment_type in EXPERIMENT_TYPES:
                 for replica_index in range(num_replicas):
+
+                    hans_eval_heuristic_inputs = hans_helper.sample_batch_of_heuristic(
+                        mode="eval", heuristic=train_heuristic, size=128)
+
+                    misc_utils.move_inputs_to_device(
+                        inputs=hans_eval_heuristic_inputs,
+                        device=task_model.device)
+
                     for version_2_num_datapoints in VERSION_2_NUM_DATAPOINTS_CHOICES:
                         for version_2_learning_rate in VERSION_2_LEARNING_RATE_CHOICES:
 
@@ -154,7 +162,9 @@ def main(
                                     s_test_num_samples=s_test_num_samples,
                                     trainer=trainer,
                                     version_2_num_datapoints=version_2_num_datapoints,
-                                    version_2_learning_rate=version_2_learning_rate)
+                                    version_2_learning_rate=version_2_learning_rate,
+                                    hans_eval_heuristic_inputs=hans_eval_heuristic_inputs,
+                                )
 
                                 output_collections[
                                     f"{experiment_type}-"
@@ -190,20 +200,14 @@ def one_experiment(
     s_test_scale: float,
     s_test_num_samples: int,
     trainer: transformers.Trainer,
-    version_2_num_datapoints: Optional[int] = None,
-    version_2_learning_rate: Optional[float] = None,
+    version_2_num_datapoints: Optional[int],
+    version_2_learning_rate: Optional[float],
+    hans_eval_heuristic_inputs: Dict[str, Any],
 ) -> Tuple[Dict[str, Any], Optional[torch.nn.Module]]:
     if task_model.device.type != "cuda":
         raise ValueError("The model is supposed to be on CUDA")
 
     if experiment_type in ["most-harmful", "most-helpful"]:
-
-        hans_eval_heuristic_inputs = hans_helper.sample_batch_of_heuristic(
-            mode="eval", heuristic=train_heuristic, size=128)
-
-        misc_utils.move_inputs_to_device(
-            inputs=hans_eval_heuristic_inputs,
-            device=task_model.device)
 
         influences = influence_helpers.compute_influences_simplified(
             k=DEFAULT_KNN_K,
