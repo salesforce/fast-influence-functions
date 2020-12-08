@@ -60,7 +60,8 @@ class HansHelper(object):
             self,
             mode: str,
             heuristic: str,
-            size: int) -> np.ndarray:
+            size: int,
+            return_raw_data: bool = False) -> np.ndarray:
 
         if mode not in ["train", "eval"]:
             raise ValueError
@@ -79,7 +80,12 @@ class HansHelper(object):
         sampled_indices = np.random.choice(
             indices, size=size, replace=False)
 
-        return default_data_collator([dataset[index] for index in sampled_indices])
+        sampled_data = [dataset[index] for index in sampled_indices]
+        batched_data = default_data_collator(sampled_data)
+        if return_raw_data is False:
+            return batched_data
+
+        return batched_data, sampled_data
 
     def get_dataset_and_dataloader_of_heuristic(
             self,
