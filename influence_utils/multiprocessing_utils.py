@@ -1,3 +1,8 @@
+# Copyright (c) 2020, salesforce.com, inc.
+# All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+# For full license text, see the LICENSE file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+
 """Light Modification of the following file (v1.5.1)
 
    https://github.com/pytorch/pytorch/blob/v1.5.1/torch/multiprocessing/spawn.py

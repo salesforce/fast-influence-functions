@@ -1,3 +1,8 @@
+# Copyright (c) 2020, salesforce.com, inc.
+# All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+# For full license text, see the LICENSE file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+
 # https://stackoverflow.com/questions/2107945/how-to-loop-over-directories-in-linux
 data_dir=$1
 output_dir=$2
