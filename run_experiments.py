@@ -123,20 +123,6 @@ def imitator_experiments(
         num_examples_to_test=num_experiments)
 
 
-# ------------------------------------------------------------------
-# TEST FUNCTIONS
-# ------------------------------------------------------------------
-def check_KNN_recall_local_remote_match(
-        local_output_collections: Dict,
-        remote_output_collections: Dict
-) -> None:
-    assert local_output_collections["time"] == remote_output_collections["time"]
-    assert local_output_collections["correct"] == remote_output_collections["correct"]
-    assert local_output_collections["influences"] == remote_output_collections["influences"]
-    for index in range(len(local_output_collections["s_test"])):
-        assert (local_output_collections["s_test"][index] == remote_output_collections["s_test"][index]).all()
-
-
 if __name__ == "__main__":
     # Make sure the environment is properly setup
     remote_utils.setup_and_verify_environment()
