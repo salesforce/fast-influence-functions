@@ -92,12 +92,7 @@ RUN \
     ~/.fzf/install --all && \
     # Install Awesome vimrc
     git clone --depth=1 https://github.com/amix/vimrc.git ~/.vim_runtime && \
-    sh ~/.vim_runtime/install_awesome_vimrc.sh && \
-    # Cache Github Passwords
-    git config --global credential.helper cache && \
-    # Set Git profile
-    git config --global user.name "HanGuo97" && \
-    git config --global user.email "alex.guohan1106@gmail.com"
+    sh ~/.vim_runtime/install_awesome_vimrc.sh
 
 # Reset Entrypoint from Parent Images
 # https://stackoverflow.com/questions/40122152/how-to-remove-entrypoint-from-parent-image-on-dockerfile/40122750
