@@ -8,7 +8,7 @@ from experiments import remote_utils
 from experiments import visualization
 
 
-USE_PARALLEL = True
+USE_PARALLEL = False
 NUM_KNN_RECALL_EXPERIMENTS = 50
 NUM_RETRAINING_EXPERIMENTS = 3
 NUM_STEST_EXPERIMENTS = 10
@@ -97,11 +97,13 @@ def hans_augmentation_experiments(
     # `eval_heuristics`. So looping over the `DEFAULT_EVAL_HEURISTICS`
     for train_task_name in ["mnli-2", "hans"]:
         for train_heuristic in hans.DEFAULT_EVAL_HEURISTICS:
-            hans.main(
-                train_task_name=train_task_name,
-                train_heuristic=train_heuristic,
-                num_replicas=num_replicas,
-                use_parallel=USE_PARALLEL)
+            for version in ["new-only-z", "new-only-ztest", "new-z-and-ztest"]:
+                hans.main(
+                    train_task_name=train_task_name,
+                    train_heuristic=train_heuristic,
+                    num_replicas=num_replicas,
+                    use_parallel=USE_PARALLEL,
+                    version=version)
 
 
 def imitator_experiments(

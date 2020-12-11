@@ -4,15 +4,15 @@ import transformers
 from tqdm import tqdm
 from copy import deepcopy
 from collections import defaultdict
+from transformers import InputFeatures
 from transformers import default_data_collator
 from typing import Union, Dict, Any, List, Tuple, Optional
 
-from influence_utils import parallel
 from influence_utils import faiss_utils
 from influence_utils import nn_influence_utils
 from experiments import constants
 from experiments import misc_utils
-from experiments import remote_utils
+# from experiments import remote_utils
 from experiments import influence_helpers
 from experiments.hans_utils import HansHelper
 from transformers import TrainingArguments
@@ -23,9 +23,10 @@ from experiments.data_utils import (
 
 DEFAULT_KNN_K = 1000
 DEFAULT_NUM_REPLICAS = 3
+EVAL_HEURISTICS_SAMPLE_BATCH_SIZE = 10
 EXPERIMENT_TYPES = ["most-helpful", "most-harmful", "random"]
 DEFAULT_EVAL_HEURISTICS = ["lexical_overlap", "subsequence", "constituent"]
-VERSION_2_NUM_DATAPOINTS_CHOICES = [1]
+VERSION_2_NUM_DATAPOINTS_CHOICES = [EVAL_HEURISTICS_SAMPLE_BATCH_SIZE]
 VERSION_2_LEARNING_RATE_CHOICES = [1e-4]
 
 
@@ -47,10 +48,7 @@ def main(
     if num_replicas is None:
         num_replicas = DEFAULT_NUM_REPLICAS
 
-    if version is None:
-        version = "new"
-
-    if version not in ["old", "new"]:
+    if version not in ["new-only-z", "new-only-ztest", "new-z-and-ztest"]:
         raise ValueError
 
     task_tokenizer, task_model = misc_utils.create_tokenizer_and_model(
@@ -119,32 +117,7 @@ def main(
     output_collections: Dict[str, List] = defaultdict(list)
 
     if version == "old":
-        num_total_experiments = len(EXPERIMENT_TYPES) * num_replicas
-        with tqdm(total=num_total_experiments) as pbar:
-            for experiment_type in EXPERIMENT_TYPES:
-                for replica_index in range(num_replicas):
-                    outputs_one_experiment, _ = one_experiment(
-                        use_parallel=use_parallel,
-                        train_heuristic=train_heuristic,
-                        eval_heuristics=eval_heuristics,
-                        experiment_type=experiment_type,
-                        hans_helper=hans_helper,
-                        train_dataset=train_dataset,
-                        task_model=task_model,
-                        faiss_index=faiss_index,
-                        s_test_damp=s_test_damp,
-                        s_test_scale=s_test_scale,
-                        s_test_num_samples=s_test_num_samples,
-                        trainer=trainer,
-                        version=version)
-                    output_collections[experiment_type].append(outputs_one_experiment)
-
-                    pbar.update(1)
-                    pbar.set_description(f"{experiment_type} #{replica_index}")
-
-        remote_utils.save_and_mirror_scp_to_remote(
-            object_to_save=output_collections,
-            file_name=f"hans-augmentation.{train_heuristic}.{num_replicas}.pth")
+        raise ValueError("Deprecated")
 
     else:
         NUM_STEPS = 10
@@ -159,6 +132,18 @@ def main(
         with tqdm(total=num_total_experiments) as pbar:
             for experiment_type in EXPERIMENT_TYPES:
                 for replica_index in range(num_replicas):
+
+                    (hans_eval_heuristic_inputs,
+                     hans_eval_heuristic_raw_inputs) = hans_helper.sample_batch_of_heuristic(
+                        mode="eval",
+                        heuristic=train_heuristic,
+                        size=EVAL_HEURISTICS_SAMPLE_BATCH_SIZE,
+                        return_raw_data=True)
+
+                    misc_utils.move_inputs_to_device(
+                        inputs=hans_eval_heuristic_inputs,
+                        device=task_model.device)
+
                     for version_2_num_datapoints in VERSION_2_NUM_DATAPOINTS_CHOICES:
                         for version_2_learning_rate in VERSION_2_LEARNING_RATE_CHOICES:
 
@@ -181,7 +166,10 @@ def main(
                                     trainer=trainer,
                                     version=version,
                                     version_2_num_datapoints=version_2_num_datapoints,
-                                    version_2_learning_rate=version_2_learning_rate)
+                                    version_2_learning_rate=version_2_learning_rate,
+                                    hans_eval_heuristic_inputs=hans_eval_heuristic_inputs,
+                                    hans_eval_heuristic_raw_inputs=hans_eval_heuristic_raw_inputs,
+                                )
 
                                 output_collections[
                                     f"{experiment_type}-"
@@ -218,20 +206,20 @@ def one_experiment(
     s_test_num_samples: int,
     trainer: transformers.Trainer,
     version: str,
-    version_2_num_datapoints: Optional[int] = None,
-    version_2_learning_rate: Optional[float] = None,
+    version_2_num_datapoints: Optional[int],
+    version_2_learning_rate: Optional[float],
+    hans_eval_heuristic_inputs: Dict[str, Any],
+    hans_eval_heuristic_raw_inputs: List[InputFeatures],
 ) -> Tuple[Dict[str, Any], Optional[torch.nn.Module]]:
     if task_model.device.type != "cuda":
         raise ValueError("The model is supposed to be on CUDA")
 
+    if version_2_num_datapoints is None:
+        raise ValueError
+    if version_2_learning_rate is None:
+        raise ValueError
+
     if experiment_type in ["most-harmful", "most-helpful"]:
-
-        hans_eval_heuristic_inputs = hans_helper.sample_batch_of_heuristic(
-            mode="eval", heuristic=train_heuristic, size=128)
-
-        misc_utils.move_inputs_to_device(
-            inputs=hans_eval_heuristic_inputs,
-            device=task_model.device)
 
         influences = influence_helpers.compute_influences_simplified(
             k=DEFAULT_KNN_K,
@@ -247,14 +235,13 @@ def one_experiment(
             precomputed_s_test=None,
             faiss_index_use_mean_features_as_query=True,
         )
-        sorted_indices = misc_utils.sort_dict_keys_by_vals(influences)
+        helpful_indices, harmful_indices = misc_utils.get_helpful_harmful_indices_from_influences_dict(
+            influences, n=version_2_num_datapoints)
         if experiment_type == "most-helpful":
-            datapoint_indices = sorted_indices
+            datapoint_indices = helpful_indices
 
         if experiment_type == "most-harmful":
-            # So that `datapoint_indices[:n]` return the
-            # top-n most harmful datapoints
-            datapoint_indices = sorted_indices[::-1]
+            datapoint_indices = harmful_indices
 
     if experiment_type == "random":
         # s_test = None
@@ -269,94 +256,55 @@ def one_experiment(
     loss_collections = {}
     accuracy_collections = {}
 
-    if version == "old":
-        num_datapoints_choices = [1, 10, 100]
-        learning_rate_choices = [1e-5, 1e-4, 1e-3]
-        for num_datapoints in num_datapoints_choices:
-            for learning_rate in learning_rate_choices:
-                datapoints = [
-                    train_dataset[index]
-                    for index in datapoint_indices[:num_datapoints]]
-                batch = default_data_collator(datapoints)
-                new_model, _ = pseudo_gradient_step(
-                    model=task_model,
-                    inputs=batch,
-                    learning_rate=learning_rate)
+    # num_datapoints = 1
+    # learning_rate = 1e-4
+    num_datapoints = version_2_num_datapoints
+    learning_rate = version_2_learning_rate
 
-                for heuristic in eval_heuristics:
-                    new_model_loss, new_model_accuracy = evaluate_heuristic(
-                        hans_helper=hans_helper,
-                        heuristic=heuristic,
-                        trainer=trainer,
-                        model=new_model)
-
-                    loss_collections[
-                        f"{num_datapoints}-"
-                        f"{learning_rate}-"
-                        f"{heuristic}"] = new_model_loss
-
-                    accuracy_collections[
-                        f"{num_datapoints}-"
-                        f"{learning_rate}-"
-                        f"{heuristic}"] = new_model_accuracy
-                    # print(f"Finished {num_datapoints}-{learning_rate}")
-
-        output_collections = {
-            # "s_test": s_test,
-            "influences": influences,
-            "loss": loss_collections,
-            "accuracy": accuracy_collections,
-            "datapoint_indices": datapoint_indices,
-            "learning_rates": learning_rate_choices,
-            "num_datapoints": num_datapoints_choices,
-            "hans_eval_heuristic_inputs": hans_eval_heuristic_inputs,
-        }
-        return output_collections, None
-
-    else:
-        if version_2_num_datapoints is None:
-            raise ValueError
-        if version_2_learning_rate is None:
-            raise ValueError
-
-        # num_datapoints = 1
-        # learning_rate = 1e-4
-        num_datapoints = version_2_num_datapoints
-        learning_rate = version_2_learning_rate
-
+    if version == "new-only-z":
         datapoints = [
             train_dataset[index]
             for index in datapoint_indices[:num_datapoints]]
-        batch = default_data_collator(datapoints)
-        new_model, _ = pseudo_gradient_step(
-            model=task_model,
-            inputs=batch,
-            learning_rate=learning_rate)
 
-        for heuristic in eval_heuristics:
-            new_model_loss, new_model_accuracy = evaluate_heuristic(
-                hans_helper=hans_helper,
-                heuristic=heuristic,
-                trainer=trainer,
-                model=new_model)
+    if version == "new-only-ztest":
+        datapoints = hans_eval_heuristic_raw_inputs
 
-            loss_collections[heuristic] = new_model_loss
-            accuracy_collections[heuristic] = new_model_accuracy
-            # print(f"Finished {num_datapoints}-{learning_rate}")
+    if version == "new-z-and-ztest":
+        datapoints = [
+            train_dataset[index]
+            for index in datapoint_indices[:num_datapoints]
+        ] + hans_eval_heuristic_raw_inputs
 
-        output_collections = {
-            # "s_test": s_test,
-            "influences": influences,
-            "loss": loss_collections,
-            "accuracy": accuracy_collections,
-            "datapoint_indices": datapoint_indices,
-            "learning_rate": learning_rate,
-            "num_datapoints": num_datapoints,
-            "hans_eval_heuristic_inputs": hans_eval_heuristic_inputs,
-        }
+    batch = default_data_collator(datapoints)
+    new_model, _ = pseudo_gradient_step(
+        model=task_model,
+        inputs=batch,
+        learning_rate=learning_rate)
 
-        # Warning: Check again whether using this `new_model` is a good idea
-        return output_collections, new_model
+    for heuristic in eval_heuristics:
+        new_model_loss, new_model_accuracy = evaluate_heuristic(
+            hans_helper=hans_helper,
+            heuristic=heuristic,
+            trainer=trainer,
+            model=new_model)
+
+        loss_collections[heuristic] = new_model_loss
+        accuracy_collections[heuristic] = new_model_accuracy
+        # print(f"Finished {num_datapoints}-{learning_rate}")
+
+    output_collections = {
+        # "s_test": s_test,
+        "influences": influences,
+        "loss": loss_collections,
+        "accuracy": accuracy_collections,
+        "datapoint_indices": datapoint_indices,
+        "learning_rate": learning_rate,
+        "num_datapoints": num_datapoints,
+        "hans_eval_heuristic_inputs": hans_eval_heuristic_inputs,
+    }
+
+    # Warning: Check again whether using this `new_model` is a good idea
+    return output_collections, new_model
 
 
 def pseudo_gradient_step(
