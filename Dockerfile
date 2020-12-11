@@ -30,9 +30,9 @@ RUN \
     # ubuntu-drivers autoinstall && \
     # https://serverfault.com/questions/227190/how-do-i-ask-apt-get-to-skip-any-interactive-post-install-configuration-steps
     # https://stackoverflow.com/questions/38165407/installing-lightdm-in-dockerfile-raises-interactive-keyboard-layout-menu
-    apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        nvidia-driver-440 && \
-    rm -rf /var/lib/apt/lists/* && \
+    # apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    #     nvidia-driver-440 && \
+    # rm -rf /var/lib/apt/lists/* && \
     # Install NodeJS
     # https://github.com/nodesource/distributions/blob/master/README.md#deb
     curl -sL https://deb.nodesource.com/setup_12.x | bash - && \
@@ -61,9 +61,9 @@ RUN \
 # ---------------------------------------------
 # Build Python depencies and utilize caching
 # ---------------------------------------------
-COPY ./requirements.txt /workspace/hguo-scratchpad/requirements.txt
+COPY ./fast-influence-functions/requirements.txt /workspace/fast-influence-functions/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r /workspace/hguo-scratchpad/requirements.txt && \
+    pip install --no-cache-dir -r /workspace/fast-influence-functions/requirements.txt && \
     # Jupyter Extensions (https://plot.ly/python/getting-started/):
     # Avoid "JavaScript heap out of memory" errors during extension installation (OS X/Linux)
     export NODE_OPTIONS=--max-old-space-size=4096 && \
@@ -71,13 +71,17 @@ RUN pip install --no-cache-dir --upgrade pip && \
     jupyter labextension install @oriolmirosa/jupyterlab_materialdarker --no-build  && \
     jupyter lab build && \
     # Unset NODE_OPTIONS environment variable (OS X/Linux)
-    unset NODE_OPTIONS
+    unset NODE_OPTIONS && \
+    # for binding/linking path from host machines
+    mkdir -p /nlp && \
+    mkdir -p /export/ && \
+    chmod -R 777 /export
 
 # upload everything
-COPY . /workspace/hguo-scratchpad/
+COPY --chown=259446:3406 ./fast-influence-functions/ /workspace/fast-influence-functions/
 
 # Set HOME
-ENV HOME="/workspace/hguo-scratchpad"
+ENV HOME="/workspace/fast-influence-functions"
 
 # ---------------------------------------------
 # Project-agnostic User-dependent Dependencies
