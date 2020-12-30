@@ -547,16 +547,10 @@ def plot_Xs_and_Ys_dict(
             data_mean = data.mean(axis=0)
             data_max = data.max(axis=0)
             data_min = data.min(axis=0)
-            # data_std = data.std(axis=0)
             plt.plot(Xs, data_mean,
                      color=color,
                      linestyle=("--" if is_random_data_point else None))
 
-            # plt.fill_between(Xs,
-            #                  data_mean + 1. * data_std,
-            #                  data_mean - 1. * data_std,
-            #                  color=color,
-            #                  alpha=0.1 if is_random_data_point else 0.2)
             plt.fill_between(Xs, data_max, data_min,
                              alpha=0.1,
                              color=color)

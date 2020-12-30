@@ -1,4 +1,4 @@
-# Fast Influence Functions
+# FastIF: Scalable Influence Functions for\\Efficient Model Interpretation and Debugging
 ![main](figs/main.png)
 
 # Requirements
