@@ -196,8 +196,17 @@ def compute_s_test(
     # Do this for each iteration of estimation
     # Since we use one estimation, we put this at the end
     inverse_hvp = [X / scale for X in last_estimate]
-    # Do this at the end
-    inverse_hvp = [X / cumulative_num_samples for X in inverse_hvp]
+
+    # Sanity check
+    # Note that in parallel settings, we should have `num_samples`
+    # whereas in sequential settings we would have `num_samples + 2`.
+    # This is caused by some loose stop condition. In parallel settings,
+    # We only allocate `num_samples` data to reduce communication overhead.
+    # Should probably make this more consistent sometime.
+    if cumulative_num_samples not in [num_samples, num_samples + 2]:
+        raise ValueError(f"cumulative_num_samples={cumulative_num_samples} f"
+                         f"but num_samples={num_samples}: Untested Territory")
+
     return inverse_hvp
 
 
