@@ -7,8 +7,10 @@ import os
 import time
 import torch
 import logging
-
+import pandas as pd
+from tqdm import trange
 from typing import Optional, Union, List, Dict
+
 from transformers import (
     GlueDataset,
     GlueDataTrainingArguments,
@@ -30,6 +32,11 @@ from transformers.data.processors.glue import (
     MnliProcessor,
     MnliMismatchedProcessor)
 from transformers.data.metrics import simple_accuracy
+
+try:
+    from wilds.datasets.amazon_dataset import AmazonDataset
+except ModuleNotFoundError:
+    AmazonDataset = None
 
 logger = logging.getLogger(__name__)
 
@@ -191,6 +198,85 @@ class HansProcessor(DataProcessor):
             return "entailment"
 
 
+class WILDSAmazonProcessor(DataProcessor):
+    """Processor for the Amazon data set (WILDS version)."""
+
+    def get_train_examples(self, data_dir):
+        """See base class."""
+        # Using `quotechar` since some rows have strings that span multiple lines
+        return self._create_examples(self._read_tsv(os.path.join(data_dir, "amazon.train.tsv"), quotechar='"'), "train")
+
+    def get_dev_examples(self, data_dir):
+        """See base class."""
+        # Using `quotechar` since some rows have strings that span multiple lines
+        return self._create_examples(self._read_tsv(os.path.join(data_dir, "amazon.val.tsv"), quotechar='"'), "dev")
+
+    def get_test_examples(self, data_dir):
+        """See base class."""
+        # Using `quotechar` since some rows have strings that span multiple lines
+        return self._create_examples(self._read_tsv(os.path.join(data_dir, "amazon.test.tsv"), quotechar='"'), "test")
+
+    def get_labels(self):
+        """See base class."""
+        return ["0", "1", "2", "3", "4"]
+
+    def _create_examples(self, lines, set_type):
+        """Creates examples for the training, dev and test sets."""
+        examples = []
+        for (i, line) in enumerate(lines):
+            if i == 0:
+                continue
+            guid = "%s-%s" % (set_type, i)
+            text_a = line[0]
+            label = line[1]
+            examples.append(InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
+        return examples
+
+
+class ANLIProcessor(DataProcessor):
+    """Processor for the HANS data set."""
+
+    def get_train_examples(self, data_dir: str) -> List[InputExample]:
+        """See base class."""
+        return self._create_examples(self._read_tsv(os.path.join(data_dir, "train.tsv"), quotechar='"'), "train")
+
+    def get_dev_examples(self, data_dir: str) -> List[InputExample]:
+        """See base class."""
+        return self._create_examples(self._read_tsv(os.path.join(data_dir, "valid.tsv"), quotechar='"'), "dev")
+
+    def get_test_examples(self, data_dir: str) -> List[InputExample]:
+        """See base class."""
+        return self._create_examples(self._read_tsv(os.path.join(data_dir, "test.tsv"), quotechar='"'), "test")
+
+    def get_labels(self) -> List[str]:
+        """See base class."""
+        return ["contradiction", "entailment", "neutral"]
+
+    def _create_examples(self, lines: List[List[str]], set_type: str) -> List[InputExample]:
+        """Creates examples for the training and dev sets."""
+        examples = []
+        for (i, line) in enumerate(lines):
+            if i == 0:
+                continue
+            guid = "%s-%s" % (set_type, i)
+            text_a = line[1]
+            text_b = line[2]
+            label = self._preprocess_label(line[3])
+            examples.append(InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
+        return examples
+
+    def _preprocess_label(self, label: str) -> str:
+        label_map = {
+            "e": "entailment",
+            "n": "neutral",
+            "c": "contradiction"
+        }
+        if label not in label_map.keys():
+            raise ValueError(f"Label {label} not recognized.")
+
+        return label_map[label]
+
+
 def glue_compute_metrics(task_name: str, preds: List, labels: List) -> Dict[str, float]:
     assert len(preds) == len(labels)
     if task_name not in glue_processors.keys():
@@ -199,10 +285,34 @@ def glue_compute_metrics(task_name: str, preds: List, labels: List) -> Dict[str,
     return {"acc": simple_accuracy(preds, labels)}
 
 
+def write_amazon_dataset_to_disk(base_dir: str) -> None:
+    dataset = AmazonDataset(download=False)
+    for split in dataset.split_dict.keys():
+        datasubset = dataset.get_subset(split)
+        file_name = os.path.join(
+            base_dir,
+            f"amazon.{split}.tsv")
+
+        examples = []
+        for index in trange(len(datasubset)):
+            examples.append({
+                "sentence": datasubset[index][0],
+                "label": datasubset[index][1].item()})
+
+        pd.DataFrame(examples).to_csv(
+            file_name,
+            sep="\t",
+            index=False)
+
+        print(f"Wrote {file_name} to disk")
+
+
 glue_tasks_num_labels = {
     "mnli": 3,
     "mnli-2": 2,
     "hans": 2,
+    "amazon": 5,
+    "anli": 3,
 }
 
 glue_processors = {
@@ -211,6 +321,8 @@ glue_processors = {
     "mnli-2": TwoLabelMnliProcessor,
     "mnli-2-mm": TwoLabelMnliMismatchedProcessor,
     "hans": HansProcessor,
+    "amazon": WILDSAmazonProcessor,
+    "anli": ANLIProcessor,
 }
 
 glue_output_modes = {
@@ -219,4 +331,6 @@ glue_output_modes = {
     "mnli-2": "classification",
     "mnli-2-mm": "classification",
     "hans": "classification",
+    "amazon": "classification",
+    "anli": "classification",
 }
