@@ -13,7 +13,7 @@ from experiments import remote_utils
 from experiments import visualization
 
 
-USE_PARALLEL = False
+USE_PARALLEL = True
 NUM_KNN_RECALL_EXPERIMENTS = 50
 NUM_RETRAINING_EXPERIMENTS = 3
 NUM_STEST_EXPERIMENTS = 10
@@ -76,7 +76,7 @@ def visualization_experiments(
     if num_experiments is None:
         num_experiments = NUM_VISUALIZATION_EXPERIMENTS
 
-    for heuristic in hans.DEFAULT_EVAL_HEURISTICS:
+    for heuristic in hans.DEFAULT_HANS_EVAL_HEURISTICS:
         visualization.main(
             train_task_name="hans",
             eval_task_name="hans",
@@ -94,16 +94,63 @@ def visualization_experiments(
         trained_on_task_name="hans")
 
 
+def prepare_data_for_retraining(
+        num_eval_to_collect: int,
+) -> None:
+    for mode in ["only-correct", "only-incorrect"]:
+        for kNN_k in [1000, 10000]:
+            visualization.main(
+                mode=mode,
+                train_task_name="mnli",
+                eval_task_name="mnli",
+                num_eval_to_collect=num_eval_to_collect,
+                use_parallel=True,
+                kNN_k=kNN_k)
+
+
 def hans_augmentation_experiments(
         num_replicas: Optional[int] = None
 ) -> None:
     print("RUNNING `hans_augmentation_experiments`")
     # We will use the all the `train_heuristic` here, as we did in
-    # `eval_heuristics`. So looping over the `DEFAULT_EVAL_HEURISTICS`
+    # `eval_heuristics`. So looping over the `DEFAULT_HANS_EVAL_HEURISTICS`
     for train_task_name in ["mnli-2", "hans"]:
-        for train_heuristic in hans.DEFAULT_EVAL_HEURISTICS:
-            for version in ["new-only-z", "new-only-ztest", "new-z-and-ztest"]:
+        for train_heuristic in hans.DEFAULT_HANS_EVAL_HEURISTICS:
+            for version in ["new-only-z", "new-only-ztest"]:
                 hans.main(
+                    trained_on_task_name="mnli-2",
+                    train_task_name=train_task_name,
+                    train_heuristic=train_heuristic,
+                    num_replicas=num_replicas,
+                    use_parallel=USE_PARALLEL,
+                    version=version)
+
+
+def amazon_augmentation_experiments(
+        num_replicas: Optional[int] = None
+) -> None:
+    print("RUNNING `amazon_augmentation_experiments`")
+    for train_task_name in ["amazon"]:
+        for train_heuristic in hans.DEFAULT_Amazon_EVAL_HEURISTICS:
+            for version in ["new-only-z", "new-only-ztest"]:
+                hans.main(
+                    trained_on_task_name="amazon",
+                    train_task_name=train_task_name,
+                    train_heuristic=train_heuristic,
+                    num_replicas=num_replicas,
+                    use_parallel=USE_PARALLEL,
+                    version=version)
+
+
+def anli_augmentation_experiments(
+        num_replicas: Optional[int] = None
+) -> None:
+    print("RUNNING `anli_augmentation_experiments`")
+    for train_task_name in ["anli"]:
+        for train_heuristic in hans.DEFAULT_ANLI_EVAL_HEURISTICS:
+            for version in ["new-only-z", "new-only-ztest"]:
+                hans.main(
+                    trained_on_task_name="mnli",
                     train_task_name=train_task_name,
                     train_heuristic=train_heuristic,
                     num_replicas=num_replicas,
@@ -130,7 +177,7 @@ def imitator_experiments(
 
 if __name__ == "__main__":
     # Make sure the environment is properly setup
-    remote_utils.setup_and_verify_environment()
+    # remote_utils.setup_and_verify_environment()
 
     experiment_name = sys.argv[1]
     if experiment_name == "knn-recall-correct":
@@ -165,6 +212,12 @@ if __name__ == "__main__":
 
     if experiment_name == "hans-augmentation":
         hans_augmentation_experiments()
+
+    if experiment_name == "amazon-augmentation":
+        amazon_augmentation_experiments()
+
+    if experiment_name == "anli-augmentation":
+        anli_augmentation_experiments()
 
     if experiment_name == "imitator":
         imitator_experiments()

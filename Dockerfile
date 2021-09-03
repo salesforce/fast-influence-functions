@@ -64,14 +64,6 @@ RUN \
 COPY ./fast-influence-functions/requirements.txt /workspace/fast-influence-functions/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r /workspace/fast-influence-functions/requirements.txt && \
-    # Jupyter Extensions (https://plot.ly/python/getting-started/):
-    # Avoid "JavaScript heap out of memory" errors during extension installation (OS X/Linux)
-    export NODE_OPTIONS=--max-old-space-size=4096 && \
-    jupyter labextension install @jupyter-widgets/jupyterlab-manager --no-build && \
-    jupyter labextension install @oriolmirosa/jupyterlab_materialdarker --no-build  && \
-    jupyter lab build && \
-    # Unset NODE_OPTIONS environment variable (OS X/Linux)
-    unset NODE_OPTIONS && \
     # for binding/linking path from host machines
     mkdir -p /nlp && \
     mkdir -p /export/ && \

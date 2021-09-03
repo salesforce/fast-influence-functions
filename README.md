@@ -39,4 +39,4 @@ DOCKER_BUILDKIT=1 docker build \
 ### `influence_utils/`
 This directory contains the core components of the influence functions. Most of the codes are designed to be independent of the experiments so could be adapted for others downstream needs. Two of the most important ones are:
 - `influence_utils/nn_influence_utils.py` contains the code for influence functions.
-- `influence_utils/parallel.py` contains the code for the parallel variant.
+- `influence_utils/parallel.py` contains the code for the parallel variant. Note that when running the parallel variant, make sure to turn off `wandb` (see [here](https://docs.wandb.ai/integrations/huggingface) for details) as the current codebase does not work well with `wandb` turned on.
