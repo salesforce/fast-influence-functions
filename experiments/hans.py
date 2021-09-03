@@ -19,36 +19,35 @@ from experiments import constants
 from experiments import misc_utils
 # from experiments import remote_utils
 from experiments import influence_helpers
-from experiments.hans_utils import HansHelper
+from experiments.hans_utils import HansHelper, SimpleHelper, AmazonHelper
 from transformers import TrainingArguments
-from experiments.data_utils import (
-    glue_output_modes,
-    glue_compute_metrics,
-    CustomGlueDataset)
+from experiments.data_utils import CustomGlueDataset
 
 DEFAULT_KNN_K = 1000
 DEFAULT_NUM_REPLICAS = 3
 EVAL_HEURISTICS_SAMPLE_BATCH_SIZE = 10
 EXPERIMENT_TYPES = ["most-helpful", "most-harmful", "random"]
-DEFAULT_EVAL_HEURISTICS = ["lexical_overlap", "subsequence", "constituent"]
+DEFAULT_HANS_EVAL_HEURISTICS = ["lexical_overlap", "subsequence", "constituent"]
+DEFAULT_ANLI_EVAL_HEURISTICS = ["null"]
+DEFAULT_Amazon_EVAL_HEURISTICS = ["null"]
 VERSION_2_NUM_DATAPOINTS_CHOICES = [EVAL_HEURISTICS_SAMPLE_BATCH_SIZE]
 VERSION_2_LEARNING_RATE_CHOICES = [1e-4]
 
 
 def main(
+        trained_on_task_name: str,
         train_task_name: str,
         train_heuristic: str,
-        eval_heuristics: Optional[List[str]] = None,
         num_replicas: Optional[int] = None,
         use_parallel: bool = True,
         version: Optional[str] = None,
 ) -> Dict[str, List[Dict[str, Any]]]:
 
-    if train_task_name not in ["mnli-2", "hans"]:
+    if trained_on_task_name not in ["mnli", "mnli-2", "amazon"]:
         raise ValueError
 
-    if eval_heuristics is None:
-        eval_heuristics = DEFAULT_EVAL_HEURISTICS
+    if train_task_name not in ["mnli-2", "hans", "amazon", "anli"]:
+        raise ValueError
 
     if num_replicas is None:
         num_replicas = DEFAULT_NUM_REPLICAS
@@ -56,55 +55,104 @@ def main(
     if version not in ["new-only-z", "new-only-ztest", "new-z-and-ztest"]:
         raise ValueError
 
-    task_tokenizer, task_model = misc_utils.create_tokenizer_and_model(
-        constants.MNLI2_MODEL_PATH)
+    if trained_on_task_name in ["mnli-2"]:
+        eval_heuristics = ["lexical_overlap"]  # randomly pick one
+        task_tokenizer, task_model = misc_utils.create_tokenizer_and_model(
+            constants.MNLI2_MODEL_PATH)
 
-    (mnli_train_dataset,
-     mnli_eval_dataset) = misc_utils.create_datasets(
-        task_name="mnli-2",
-        tokenizer=task_tokenizer)
+        (mnli_train_dataset,
+         mnli_eval_dataset) = misc_utils.create_datasets(
+            task_name="mnli-2",
+            tokenizer=task_tokenizer)
 
-    (hans_train_dataset,
-     hans_eval_dataset) = misc_utils.create_datasets(
-        task_name="hans",
-        tokenizer=task_tokenizer)
+        (hans_train_dataset,
+         hans_eval_dataset) = misc_utils.create_datasets(
+            task_name="hans",
+            tokenizer=task_tokenizer)
 
-    if train_task_name == "mnli-2":
-        train_dataset = mnli_train_dataset
+        if train_task_name == "mnli-2":
+            train_dataset = mnli_train_dataset
 
-    if train_task_name == "hans":
-        train_dataset = hans_train_dataset
+        if train_task_name == "hans":
+            train_dataset = hans_train_dataset
 
-    (s_test_damp,
-     s_test_scale,
-     s_test_num_samples) = influence_helpers.select_s_test_config(
-        trained_on_task_name="mnli-2",
-        train_task_name=train_task_name,
-        eval_task_name="hans",
-    )
+        (s_test_damp,
+         s_test_scale,
+         s_test_num_samples) = influence_helpers.select_s_test_config(
+            trained_on_task_name=trained_on_task_name,
+            train_task_name=train_task_name,
+            eval_task_name="hans",
+        )
 
-    hans_helper = HansHelper(
-        hans_train_dataset=hans_train_dataset,
-        hans_eval_dataset=hans_eval_dataset)
+        hans_helper = HansHelper(
+            hans_train_dataset=hans_train_dataset,
+            hans_eval_dataset=hans_eval_dataset,
+            mnli_eval_dataset=mnli_eval_dataset)
+
+    if trained_on_task_name in ["amazon"]:
+        # This is not used, so used `null` as a placeholder
+        eval_heuristics = DEFAULT_Amazon_EVAL_HEURISTICS
+        task_tokenizer, task_model = misc_utils.create_tokenizer_and_model(
+            constants.Amazon_MODEL_PATH)
+
+        (amazon_train_dataset,
+         amazon_eval_dataset,
+         amazon_test_dataset) = misc_utils.create_datasets(
+            task_name="amazon",
+            tokenizer=task_tokenizer,
+            create_test_dataset=True)
+
+        # Fine-tune on training dataset
+        train_dataset = amazon_train_dataset
+
+        (s_test_damp,
+         s_test_scale,
+         s_test_num_samples) = influence_helpers.select_s_test_config(
+            trained_on_task_name=trained_on_task_name,
+            train_task_name=train_task_name,
+            eval_task_name="amazon",
+        )
+
+        hans_helper = AmazonHelper(
+            train_dataset=amazon_train_dataset,
+            eval_dataset=amazon_eval_dataset,
+            test_dataset=amazon_test_dataset)
+
+    if trained_on_task_name in ["mnli"]:
+        # This is not used, so used `null` as a placeholder
+        eval_heuristics = DEFAULT_ANLI_EVAL_HEURISTICS
+        task_tokenizer, task_model = misc_utils.create_tokenizer_and_model(
+            constants.MNLI_MODEL_PATH)
+
+        (anli_train_dataset,
+         anli_eval_dataset,
+         anli_test_dataset) = misc_utils.create_datasets(
+            task_name="anli",
+            tokenizer=task_tokenizer,
+            create_test_dataset=True)
+
+        # Fine-tune on training dataset
+        train_dataset = anli_train_dataset
+
+        (s_test_damp,
+         s_test_scale,
+         s_test_num_samples) = influence_helpers.select_s_test_config(
+            trained_on_task_name=trained_on_task_name,
+            train_task_name=train_task_name,
+            eval_task_name="anli",
+        )
+
+        hans_helper = SimpleHelper(
+            train_dataset=anli_train_dataset,
+            eval_dataset=anli_eval_dataset,
+            test_dataset=anli_test_dataset)
 
     # We will be running model trained on MNLI-2
     # but calculate influences on HANS dataset
     faiss_index = influence_helpers.load_faiss_index(
-        trained_on_task_name="mnli-2",
+        trained_on_task_name=trained_on_task_name,
         train_task_name=train_task_name
     )
-
-    output_mode = glue_output_modes["mnli-2"]
-
-    def build_compute_metrics_fn(task_name: str):
-        def compute_metrics_fn(p):
-            if output_mode == "classification":
-                preds = np.argmax(p.predictions, axis=1)
-            elif output_mode == "regression":
-                preds = np.squeeze(p.predictions)
-            return glue_compute_metrics(task_name, preds, p.label_ids)
-
-        return compute_metrics_fn
 
     # Most of these arguments are placeholders
     # and are not really used at all, so ignore
@@ -137,18 +185,6 @@ def main(
         with tqdm(total=num_total_experiments) as pbar:
             for experiment_type in EXPERIMENT_TYPES:
                 for replica_index in range(num_replicas):
-
-                    (hans_eval_heuristic_inputs,
-                     hans_eval_heuristic_raw_inputs) = hans_helper.sample_batch_of_heuristic(
-                        mode="eval",
-                        heuristic=train_heuristic,
-                        size=EVAL_HEURISTICS_SAMPLE_BATCH_SIZE,
-                        return_raw_data=True)
-
-                    misc_utils.move_inputs_to_device(
-                        inputs=hans_eval_heuristic_inputs,
-                        device=task_model.device)
-
                     for version_2_num_datapoints in VERSION_2_NUM_DATAPOINTS_CHOICES:
                         for version_2_learning_rate in VERSION_2_LEARNING_RATE_CHOICES:
 
@@ -156,9 +192,21 @@ def main(
                             # steps so `deepcopy` it here.
                             _model = deepcopy(task_model)
                             for step in range(NUM_STEPS):
+
+                                # Sample anchor data-points every step
+                                (hans_eval_heuristic_inputs,
+                                 hans_eval_heuristic_raw_inputs) = hans_helper.sample_batch_of_heuristic(
+                                    mode="eval",
+                                    heuristic=train_heuristic,
+                                    size=EVAL_HEURISTICS_SAMPLE_BATCH_SIZE,
+                                    return_raw_data=True)
+
+                                misc_utils.move_inputs_to_device(
+                                    inputs=hans_eval_heuristic_inputs,
+                                    device=task_model.device)
+
                                 outputs_one_experiment, _model = one_experiment(
                                     use_parallel=use_parallel,
-                                    train_heuristic=train_heuristic,
                                     eval_heuristics=eval_heuristics,
                                     experiment_type=experiment_type,
                                     hans_helper=hans_helper,
@@ -189,17 +237,18 @@ def main(
         torch.save(
             output_collections,
             f"hans-augmentation-{version}."
+            f"{trained_on_task_name}."
             f"{train_task_name}."
             f"{train_heuristic}."
             f"{num_replicas}."
-            f"{use_parallel}.pth")
+            f"{use_parallel}."
+            f"{DEFAULT_KNN_K}.pth")
 
     return output_collections
 
 
 def one_experiment(
     use_parallel: bool,
-    train_heuristic: str,
     eval_heuristics: List[str],
     experiment_type: str,
     hans_helper: HansHelper,
@@ -379,7 +428,7 @@ def evaluate_heuristic(
 ) -> Tuple[float, float]:
 
     _, batch_dataloader = hans_helper.get_dataset_and_dataloader_of_heuristic(
-        mode="eval",
+        mode="test",
         heuristic=heuristic,
         batch_size=1000,
         random=False)
@@ -405,11 +454,15 @@ def create_FAISS_index(
     train_task_name: str,
     trained_on_task_name: str,
 ) -> faiss_utils.FAISSIndex:
-    if train_task_name not in ["mnli-2", "hans"]:
+    if train_task_name not in ["mnli-2", "hans", "amazon", "anli"]:
         raise ValueError
 
-    if trained_on_task_name not in ["mnli-2", "hans"]:
+    if trained_on_task_name not in ["mnli", "mnli-2", "hans", "amazon"]:
         raise ValueError
+
+    if trained_on_task_name == "mnli":
+        tokenizer, model = misc_utils.create_tokenizer_and_model(
+            constants.MNLI_MODEL_PATH)
 
     if trained_on_task_name == "mnli-2":
         tokenizer, model = misc_utils.create_tokenizer_and_model(
@@ -418,6 +471,10 @@ def create_FAISS_index(
     if trained_on_task_name == "hans":
         tokenizer, model = misc_utils.create_tokenizer_and_model(
             constants.HANS_MODEL_PATH)
+
+    if trained_on_task_name == "amazon":
+        tokenizer, model = misc_utils.create_tokenizer_and_model(
+            constants.Amazon_MODEL_PATH)
 
     train_dataset, _ = misc_utils.create_datasets(
         task_name=train_task_name,
