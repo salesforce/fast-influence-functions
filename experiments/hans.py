@@ -56,7 +56,7 @@ def main(
         raise ValueError
 
     if trained_on_task_name in ["mnli-2"]:
-        eval_heuristics = ["lexical_overlap"]  # randomly pick one
+        eval_heuristics = DEFAULT_HANS_EVAL_HEURISTICS
         task_tokenizer, task_model = misc_utils.create_tokenizer_and_model(
             constants.MNLI2_MODEL_PATH)
 
@@ -86,8 +86,7 @@ def main(
 
         hans_helper = HansHelper(
             hans_train_dataset=hans_train_dataset,
-            hans_eval_dataset=hans_eval_dataset,
-            mnli_eval_dataset=mnli_eval_dataset)
+            hans_eval_dataset=hans_eval_dataset)
 
     if trained_on_task_name in ["amazon"]:
         # This is not used, so used `null` as a placeholder

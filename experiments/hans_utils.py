@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # For full license text, see the LICENSE file in the repo root or https://opensource.org/licenses/BSD-3-Clause
 
-import click
 import torch
 import numpy as np
 import pandas as pd
@@ -42,8 +41,7 @@ class HansHelper(object):
     def __init__(
             self,
             hans_train_dataset: Optional[data_utils.CustomGlueDataset] = None,
-            hans_eval_dataset: Optional[data_utils.CustomGlueDataset] = None,
-            mnli_eval_dataset: Optional[data_utils.CustomGlueDataset] = None,) -> None:
+            hans_eval_dataset: Optional[data_utils.CustomGlueDataset] = None) -> None:
 
         # This file includes both validation and test
         combined_hans_eval_df = pd.read_csv(constants.HANS_EVAL_FILE_NAME, sep="\t")
@@ -57,7 +55,6 @@ class HansHelper(object):
         self._hans_test_df = combined_hans_eval_df[~valid_selector]
         self._hans_train_dataset = hans_train_dataset
         self._hans_eval_dataset = hans_eval_dataset
-        self._mnli_eval_dataset = mnli_eval_dataset
 
     def get_indices_of_heuristic(
             self,
@@ -134,12 +131,6 @@ class HansHelper(object):
             mode=mode, heuristic=heuristic)
 
         heuristic_dataset = SubsetDataset(dataset=dataset, indices=indices)
-        if mode == "test":
-            if self._mnli_eval_dataset is None:
-                raise ValueError
-            heuristic_dataset = self._mnli_eval_dataset
-            click.secho("Directly using MultiNLI Eval", bg="red")
-
         heuristic_dataloader = misc_utils.get_dataloader(
             dataset=heuristic_dataset,
             batch_size=batch_size,
