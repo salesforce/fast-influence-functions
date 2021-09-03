@@ -128,9 +128,11 @@ def create_tokenizer_and_model(
 def create_datasets(
         task_name: str,
         tokenizer: BertTokenizer,
-        data_dir: Optional[str] = None
-) -> Tuple[CustomGlueDataset, CustomGlueDataset]:
-    if task_name not in ["mnli", "mnli-2", "hans"]:
+        data_dir: Optional[str] = None,
+        create_test_dataset: bool = False,
+) -> Union[Tuple[CustomGlueDataset, CustomGlueDataset],
+           Tuple[CustomGlueDataset, CustomGlueDataset, CustomGlueDataset]]:
+    if task_name not in ["mnli", "mnli-2", "hans", "amazon", "anli"]:
         raise ValueError(f"Unrecognized task {task_name}")
 
     if data_dir is None:
@@ -138,6 +140,10 @@ def create_datasets(
             data_dir = constants.GLUE_DATA_DIR
         if task_name in ["hans"]:
             data_dir = constants.HANS_DATA_DIR
+        if task_name in ["amazon"]:
+            data_dir = constants.Amazon_DATA_DIR
+        if task_name in ["anli"]:
+            data_dir = constants.ANLI_DATA_DIR
 
     data_args = GlueDataTrainingArguments(
         task_name=task_name,
@@ -154,7 +160,15 @@ def create_datasets(
         tokenizer=tokenizer,
         mode="dev")
 
-    return train_dataset, eval_dataset
+    if create_test_dataset is False:
+        return train_dataset, eval_dataset
+    else:
+        test_dataset = CustomGlueDataset(
+            args=data_args,
+            tokenizer=tokenizer,
+            mode="test")
+
+        return train_dataset, eval_dataset, test_dataset
 
 
 def predict(trainer: Trainer,
