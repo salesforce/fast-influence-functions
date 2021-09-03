@@ -132,7 +132,7 @@ def select_s_test_config(
 
 def compute_influences_simplified(
         k: int,
-        faiss_index: Optional[faiss_utils.FAISSIndex],
+        faiss_index: faiss_utils.FAISSIndex,
         model: torch.nn.Module,
         inputs: Dict[str, torch.Tensor],
         train_dataset: torch.utils.data.DataLoader,
@@ -143,8 +143,6 @@ def compute_influences_simplified(
         device_ids: Optional[List[int]] = None,
         precomputed_s_test: Optional[List[torch.FloatTensor]] = None,
         faiss_index_use_mean_features_as_query: bool = False,
-        _batch_size: int = 1,
-        _s_test_iterations: int = 1,
 ) -> Dict[int, float]:
 
     # Make sure indices are sorted according to distances
@@ -180,7 +178,7 @@ def compute_influences_simplified(
         model.cuda()
         batch_train_data_loader = misc_utils.get_dataloader(
             train_dataset,
-            batch_size=_batch_size,
+            batch_size=1,
             random=True)
 
         instance_train_data_loader = misc_utils.get_dataloader(
@@ -201,7 +199,6 @@ def compute_influences_simplified(
             s_test_damp=s_test_damp,
             s_test_scale=s_test_scale,
             s_test_num_samples=s_test_num_samples,
-            s_test_iterations=_s_test_iterations,
             train_indices_to_include=KNN_indices,
             precomputed_s_test=precomputed_s_test)
     else:
